@@ -2,38 +2,39 @@
 
 <script type="module">
     import LocalSharedMemory from "./node_modules/localsharedmemory/index.js"
-    import IzomorphicProcessingUnit from "./index.js"
-
-    self.ipu = new IzomorphicProcessingUnit()
-    console.error(ipu)
-
-    const iLE = Boolean(new Uint8Array(Uint32Array.of(1).buffer).at(0));
-    const memopt = {
-        initial: 10000,
-        maximum: 10000,
-        shared: true
-    }
-    const mem = new LocalSharedMemory(
-        memopt.initial, memopt.maximum, memopt.shared
-    );
-
-    ipu.setMemory(mem)
-
-    const srcView = mem.Float32Array(9e6);
-    const dstView = mem.Float32Array(srcView.length);
-    const valView = mem.Float32Array(1).fill(2.5);
-
-    srcView.forEach((v,i) => srcView[i] = i*i);
-
-    console.log( srcView )
-    console.warn(await srcView.add(1200))
-    console.error( srcView )
-
+    import { GPU, NPU, CPU } from "./index.js"
     
-    setTimeout(async () => {
-        await ipu.calc( "f32_add", dstView, srcView, valView )
-        console.log( dstView )
-    }, 1000)
+    const source = new Float32Array(46).map(Math.random)
+    const values = Float32Array.of(2.4)
+    
+    const npu = new NPU();
+    npu.on("ready", async e => {
+        console.warn("npu ready:", npu)
 
+        const target = new Float32Array(source.length);
+        const result = await npu.f32_add( source, values, target );
+        
+        console.log("npu results:", result)
+    });
+
+    const gpu = new GPU();
+    gpu.on("ready", async e => {
+        console.warn("gpu ready:", gpu)
+
+        const target = new Float32Array(source.length);
+        const result = await gpu.f32_add( source, values, target );
+
+        console.log("gpu results:", result)
+    });
+
+    const cpu = new CPU();
+    cpu.on("ready", async e => {
+        console.warn("cpu ready:", cpu)
+
+        const target = new Float32Array(source.length);
+        const result = await cpu.f32_add( source, values, target );
+
+        console.log("cpu results:", result)
+    });
 
 </script>
