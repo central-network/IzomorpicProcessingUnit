@@ -1,5 +1,43 @@
 import enumerate from "./node_modules/niceenum/index.js"
 
+const ff = class extends Float32Array {
+    constructor ( buffer, byteOffset = 0, length = (buffer.byteLength - byteOffset)/4 ) {
+        let byteLength;
+
+        if (typeof buffer === "number") {
+            length      = buffer;
+            byteLength  = length * 4;
+            byteOffset  = CPU.memory.malloc(byteLength);
+            buffer      = CPU.memory.buffer;
+        }
+
+        if (buffer !== CPU.memory.buffer) {
+            const tempView = new Float32Array( buffer, byteOffset, length );
+            byteLength  = tempView.byteLength;
+            byteOffset  = CPU.memory.malloc(byteLength);
+            buffer      = CPU.memory.buffer;
+            const destView = new Float32Array( buffer, byteOffset, length );
+            destView.set( tempView );
+        }
+
+        super( buffer, byteOffset, length );
+    }
+
+    static from ( values = [], mapFn = v => v, thisArg = null ) {
+        const length        = values.length || 0;
+        const byteLength    = length * 4;
+        const byteOffset    = CPU.memory.malloc(byteLength);
+        const view          = new this(length);
+
+        view.set(values.map(mapFn, thisArg));
+        return view;
+    }
+
+    static of ( ...values ) {
+        return this.from( values );
+    }
+};
+
 function replaceWASM(buffer, target, offset = 0) {
     const offsetMagic = 0x26e22a98;
     const memoryMagic = 0x00010000;
@@ -88,7 +126,7 @@ function replaceWASM(buffer, target, offset = 0) {
         target = Reflect.get(target, "memory");
     }
 
-    initial = target.initial || Math.floor((target.buffer?.byteLength || target.byteLength) / 65536);
+    initial = target.create || Math.floor((target.buffer?.byteLength || target.byteLength) / 65536);
     maximum = target.maximum || initial;
     shared  = typeof (target.buffer || target).grow === "function";
 
@@ -155,184 +193,207 @@ export const CONST = [
     enumerate("FLOAT64ARRAY"),
 ];
 
-export class PUEvent extends CustomEvent {
-    constructor ( type, detail ) {
-        super( type, {detail} )
-    }
+export const fallbackHandlers = {
 
-    get data () { return this.detail; }
-}
-
-export class PU extends EventTarget {
-
-    static IDLE    = enumerate("IDLE");
-    static BUSY    = enumerate("BUSY");
-    static READY   = enumerate("READY");
-    static CLOSED  = enumerate("CLOSED");
-
-    static setMemory ( memory ) {
-        this.memory = memory ;
-    }
-
-    release () {
-
-    }
-
-    enable ( handlers = {} ) {
-        for (const name in handlers) {
-            Reflect.defineProperty(this, name, {
-                value: handlers[name], configurable: true
-            })
-        }
-
-        this.deviceState = PU.READY;
-        this.emit("ready", this);
-
-        return this;
-    }
-
-    on () {
-        this.addEventListener(...arguments);
-        return this;
-    }
-
-    once () {
-        this.addEventListener(...arguments, {once: true});
-        return this;
-    }
-
-    emit () {
-        this.dispatchEvent(new PUEvent(...arguments));
-        return this;
-    }
-
-    check () {
-
-    }
-
-    disable () {
-        Array.of(   
-            "f32_add",  "f32_mul",  "f32_div",  "f32_sub", 
-            "f32_max",  "f32_min",  "f32_neg",  "f32_abs", 
-            "f32_sqrt", "f32_ceil", "f32_floor"
-        ).forEach(Reflect.deleteProperty.bind(Reflect, this))
-    }
-
-    f32_add ( source, values, target = source ) {
+    f32_vadd : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = source[i] + v; }
                 return resolve(target);
             }
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
+
+    f32_add : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
 
             if (values.length === target.length) {
                 while (i--) { target[i] = source[i] + values[i]; }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
-        });
-    }
+            if (values.length === 1) {
+                return this.f32_vadd(
+                    source, values, target
+                ).then(resolve);
+            }
 
-    f32_mul ( source, values, target = source ) {
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
+        });
+    },
+    
+    f32_vmul : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = source[i] * v; }
                 return resolve(target);
             }
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
 
+    f32_mul : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
+    
             if (values.length === target.length) {
                 while (i--) { target[i] = source[i] * values[i]; }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
+            if (values.length === 1) {
+                return this.f32_vmul(
+                    source, values, target
+                ).then(resolve);
+            }
+    
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_div ( source, values, target = source ) {
+    },
+    
+    f32_vdiv : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = source[i] / v; }
                 return resolve(target);
             }
-
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
+     
+    f32_div : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
+    
             if (values.length === target.length) {
                 while (i--) { target[i] = source[i] / values[i]; }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
+            if (values.length === 1) {
+                return this.f32_vdiv(
+                    source, values, target
+                ).then(resolve);
+            }
+    
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_sub ( source, values, target = source ) {
+    },
+    
+    f32_vsub : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = source[i] - v; }
                 return resolve(target);
             }
-
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
+    
+    f32_sub : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
+    
             if (values.length === target.length) {
                 while (i--) { target[i] = source[i] - values[i]; }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
+            if (values.length === 1) {
+                return this.f32_vsub(
+                    options, source, values, target
+                ).then(resolve);
+            }
+    
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_max ( source, values, target = source ) {
+    },
+    
+    f32_vmax : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = Math.max(source[i], v); }
                 return resolve(target);
             }
-
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
+    
+    f32_max : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
+    
             if (values.length === target.length) {
                 while (i--) { target[i] = Math.max(source[i], values[i]); }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
+            if (values.length === 1) {
+                return this.f32_vmax(
+                    source, values, target
+                ).then(resolve);
+            }
+    
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_min ( source, values, target = source ) {
+    },
+    
+    f32_vmin : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
-
+    
             if (values.length === 1) {
                 let v = values.at(0);
                 while (i--) { target[i] = Math.min(source[i], v); }
                 return resolve(target);
             }
-
+    
+            reject(`Error: Value length (${values.length}) must be 1.`)
+        });
+    },
+    
+    f32_min : async function ( source, values, target = source ) {
+        return new Promise( (resolve, reject) => {
+            let i = target.length;
+    
             if (values.length === target.length) {
                 while (i--) { target[i] = Math.min(source[i], values[i]); }
                 return resolve(target);
             }
 
-            reject(`Error: Value length (${values.length}) must be 1 or equal to target length (${target.length}).`)
+            if (values.length === 1) {
+                return this.f32_vmin(
+                    source, values, target
+                ).then(resolve);
+            }
+    
+            reject(`Error: Value length (${values.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_neg ( source, target = source ) {
+    },
+    
+    f32_neg : async function ( options, source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -340,12 +401,12 @@ export class PU extends EventTarget {
                 while (i--) { target[i] = -source[i]; }
                 return resolve(target);
             }
-
+    
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_abs ( source, target = source ) {
+    },
+    
+    f32_abs : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -353,12 +414,12 @@ export class PU extends EventTarget {
                 while (i--) { target[i] = Math.abs(source[i]); }
                 return resolve(target);
             }
-
+    
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_sqrt ( source, target = source ) {
+    },
+    
+    f32_sqrt : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -366,12 +427,12 @@ export class PU extends EventTarget {
                 while (i--) { target[i] = Math.sqrt(source[i]); }
                 return resolve(target);
             }
-
+    
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_ceil ( source, target = source ) {
+    },
+    
+    f32_ceil : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -379,12 +440,12 @@ export class PU extends EventTarget {
                 while (i--) { target[i] = Math.ceil(source[i]); }
                 return resolve(target);
             }
-
+    
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
-    }
-
-    f32_floor ( source, target = source ) {
+    },
+    
+    f32_floor : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -392,20 +453,109 @@ export class PU extends EventTarget {
                 while (i--) { target[i] = Math.floor(source[i]); }
                 return resolve(target);
             }
-
+    
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
     }
+}
 
-    log () { console.log(...arguments) }
-    warn () { console.warn(...arguments) }
-    catch () { console.error(...arguments) }
-    error () { console.error(...arguments) }
+export class PUEvent extends CustomEvent {
+    constructor (type, detail) { super(type, {detail})}
+    get data () { return this.detail; }
+}
+
+export class PU extends EventTarget {
+    static hardwareConcurrency = navigator.hardwareConcurrency;
+
+    handlers = {}
+
+    create      () { 
+        this.createHandlers()
+        this.settleHandlers()
+
+        this.deviceState = this.INIT;
+        this.emit("create", arguments); 
+
+        this.check();
+    }
+
+    destroy     () { 
+        this.handlers    = {};
+        this.deviceState = this.CLOSED;
+        this.emit("destroy", arguments) 
+    }
+    
+    release     ( args ) { 
+        this.lockState = this.IDLE;
+        this.emit("idle", args);
+    }
+
+    lock        ( args ) {
+        this.lockState = this.LOCKED;
+        this.emit("lock", args);
+    }
+
+    error       () { this.emit("error"); }
+    ready       () { this.emit("ready"); }
+
+    log         () {   console.log(...arguments) }
+    warn        () {  console.warn(...arguments) }
+    catch       () { console.error(...arguments) }
+    error       () { console.error(...arguments) }
+
+    on          () { return this.addEventListener(...arguments), this; }
+    once        () { return this.addEventListener(...arguments, {once: true}), this; }
+    emit        () { return this.dispatchEvent(new PUEvent(...arguments)), this; }
+
+    check () {
+        this.lockState   = this.IDLE;
+        this.deviceState = this.READY;
+        this.emit("ready");
+    }
+
+    createHandlers () {
+        throw `PU class need has own create handlers function!`
+    }
+
+    settleHandlers () {
+        const properties = {};
+        const prototype = Object.getPrototypeOf(this);
+        
+        for (const name in this.handlers) {
+            properties[ name ]  = { 
+                value           : this.handlers[name], 
+                configurable    : true 
+            };
+        }
+
+        Object.defineProperties(prototype, properties);
+    }
+
+    restore () {
+        for (const name in this.handlers) {
+            Reflect.deleteProperty(this, name);
+        }
+        this.emit("restore", this.handlers);
+    }
+
+    async calc (options, ...args) {
+        const handler = fallbackHandlers[ options.funcName ];
+        return Reflect.apply( handler, this, args );
+    }
 } 
+
+Object.defineProperties(PU.prototype, {
+    IDLE    : { value: enumerate("IDLE") },
+    BUSY    : { value: enumerate("BUSY") },
+    READY   : { value: enumerate("READY") },
+    LOCKED  : { value: enumerate("LOCKED") },
+    CLOSED  : { value: enumerate("CLOSED") },
+    INIT    : { value: enumerate("INIT") },
+});
 
 export class CPU extends PU {
 
-    static get memory () {
+    static createMemory () {
         const memory = new WebAssembly.Memory({initial: 100, maximum: 100, shared: true});
         const atomic = new Uint32Array(memory.buffer);
         const malloc = Atomics.add.bind(Atomics, atomic, 1);
@@ -421,7 +571,8 @@ export class CPU extends PU {
             }
         });
 
-        Reflect.defineProperty(this, "memory", { value: memory })
+        Reflect.defineProperty(memory, "isDefaultMemory", { value: true });
+        Reflect.defineProperty(PU, "memory", { value: memory, configurable: true })
 
         return memory;
     }
@@ -440,153 +591,156 @@ export class CPU extends PU {
                     const f = atomic.at.bind(atomic, 1);
                     const pid = Number(name)
                     WebAssembly
-                    .instantiate(module, {env: {memory}})
-                        .then(({exports: {func}}) => {
-                            postMessage(pid);
-                            let cycle = 0;
-                            while (++cycle) {
-                                Atomics.store(atomic, 0, 0);
-                                Atomics.wait(atomic, 0);
-                                func.get(atomic[1]).apply(null, args);
-                                postMessage(null);
-                            }
-                        })
+                        .instantiate(module, {env: {memory}})
+                            .then(({exports: {func}}) => {
+                                postMessage(pid);
+                                let cycle = 0;
+                                while (++cycle) {
+                                    Atomics.store(atomic, 0, 0);
+                                    Atomics.wait(atomic, 0);
+                                    func.get(atomic[1]).apply(null, args);
+                                    postMessage(null);
+                                }
+                            })
                     .catch((err) => postMessage(err))
                 }
             }, `)`, `()`
         ])
     );
 
+    imports     = new WeakMap();
     workers     = new Map();
-    concurrency = navigator.hardwareConcurrency
 
-    fork () {
-        return new Promise((resolve, reject) => {
-            const pid    = this.workers.size + 1;
-            const worker = new Worker(CPU.workerURL, {name: pid});
-            const buffer = new SharedArrayBuffer(8*4);
-            const atomic = new Int32Array(buffer);
-            
-            worker.postMessage({
-                module: this.module,
-                memory: this.memory, 
-                buffer: buffer
-            });
+    createHandlers () {
+        const refTable = this.instance.exports.func;
 
-            Object.defineProperty(worker, "pid",    { value: pid })
-            Object.defineProperty(worker, "atomic", { value: atomic })
-            Object.defineProperty(worker, "settle", { value: Int32Array.prototype.set.bind(atomic) })
-            Object.defineProperty(worker, "unlock", { value: Atomics.notify.bind(Atomics, atomic, 0, 1, 1) })
+        for (const name in this.instance.exports) {
+            if (Reflect.has(fallbackHandlers, name)) {
+                let i = -1, length = refTable.length;
+                while (++i < length) {
+                    if (refTable.get(i) === this.instance.exports[name]) {
+                        const options = {funcName: name, refIndex: i};
+                        this.handlers[ name ] = this.calc.bind(this, options);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    async createWorkerThreads () {
+        return Promise.all(new Array(PU.hardwareConcurrency).fill().map(() => {
+            return new Promise((resolve, reject) => {
+                const pid    = this.workers.size + 1;
+                const worker = new Worker(CPU.workerURL, {name: pid});
+                const buffer = new SharedArrayBuffer(8*4);
+                const atomic = new Int32Array(buffer);
+                
+                worker.postMessage({
+                    module: this.module,
+                    memory: this.memory, 
+                    buffer: buffer
+                });
     
-            worker.addEventListener(
-                "message", e => {
-                    if (e.data != pid)
-                        return reject(pid)
-                    else resolve(pid)
-                }, {once: true}
-            );
-
-            this.workers.set(pid, worker);
-        })
-    }
-
-    constructor (memory = new.target.memory) {
-        super()
+                Object.defineProperty(worker, "pid", { value: pid })
+                Object.defineProperty(worker, "settask", { value: Int32Array.prototype.set.bind(atomic) })
+                Object.defineProperty(worker, "unlock", { value: Atomics.notify.bind(Atomics, atomic, 0, 1, 1) })
         
-        this.memory = memory;
-        this.buffer = memory.buffer;
-
-        try {
-            const wasm          = replaceWASM(CPU.wasm, this.memory);
-            const handlers      = new Object(null);
-            const concurrency   = this.concurrency;
-            const promises      = new Array(concurrency).fill();
-            
-            WebAssembly
-                .compile(wasm)
-                    .then(module => this.module = module)
-                    .then(() => Promise.all(promises.map(() => this.fork())))
-                    .then(() => 
-                        WebAssembly.Module.exports(this.module).values().forEach((e, i) => {
-                            if (e.kind === "function" && Reflect.has(PU.prototype, e.name)) {
-                                handlers[ e.name ] = this.calc.bind(this, e.name, i);
-                            }
-                        })
-                    )
-                    .then(() => this.enable(handlers))
-                    .catch(e => this.warn(`WebAssembly not instantiated: ${e}`))
-                .finally(() => this.check());
-        }   
-        catch (e) { this.error(`WebAssembly not supported: ${e}`)}
+                worker.addEventListener(
+                    "message", e => {
+                        if (e.data != pid) {
+                            return reject(pid)
+                        } else resolve(pid)
+                    }, {once: true}
+                );
+    
+                this.workers.set(pid, worker);
+            })
+        }))
     }
 
-    Float32Array = class extends Float32Array {
+    async createWindowThread () {
+        return new Promise(async (resolve, reject) => {
+            const imports = {env: {memory: this.memory}};
+            return WebAssembly.instantiate(this.module, imports)
+                .then(instance => this.instance = instance)
+                .then(() => resolve())
+            .catch(e => reject(`WASM instance creation failed: ${e}`));
+        });
+    } 
 
-        constructor ( buffer, byteOffset = 0, length = (buffer.byteLength - byteOffset)/4 ) {
-            let byteLength;
 
-            if (typeof buffer === "number") {
-                length      = buffer;
-                byteLength  = length * 4;
-                byteOffset  = CPU.memory.malloc(byteLength);
-                buffer      = CPU.memory.buffer;
+    async create () {
+        return new Promise(async (resolve, reject) => {
+            if (this.module) { return resolve(); }
+
+            if (this.memory === undefined) {
+                this.memory = PU.memory ?? CPU.createMemory();
             }
 
-            if (buffer !== CPU.memory.buffer) {
-                const tempView = new Float32Array( buffer, byteOffset, length );
-                byteLength  = tempView.byteLength;
-                byteOffset  = CPU.memory.malloc(byteLength);
-                buffer      = CPU.memory.buffer;
-                const destView = new Float32Array( buffer, byteOffset, length );
-                destView.set( tempView );
-            }
-
-            super( buffer, byteOffset, length );
-        }
-
-        static from ( values = [], mapFn = v => v, thisArg = null ) {
-            const length        = values.length || 0;
-            const byteLength    = length * 4;
-            const byteOffset    = CPU.memory.malloc(byteLength);
-            const view          = new this(length);
-
-            view.set(values.map(mapFn, thisArg));
-            return view;
-        }
-
-        static of ( ...values ) {
-            return this.from( values );
-        }
+            try {
+                WebAssembly
+                    .compile(replaceWASM(CPU.wasm, this.memory))
+                        .then(module => this.module = module)
+                        .then(() => this.createWindowThread())
+                        .then(() => this.createWorkerThreads())
+                        .then(() => resolve())
+                    .catch((err) => reject(`WebAssembly not instantiated: ${err}`))
+                .finally(() => super.create(...arguments))
+            }   
+            catch (e) { reject(`WebAssembly not supported: ${e}`)}
+        });
     }
 
-    static imports = new WeakMap();
+    async destroy () {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (this.memory?.isDefaultMemory) {
+                    Reflect.deleteProperty(PU, "memory");
+                    Reflect.deleteProperty(this, "memory");
+                }
+    
+                Reflect.deleteProperty(this, "module");
+
+                this.workers.forEach(w => w.terminate()); // Terminate all workers
+                this.workers.clear(); // Clear the workers map
+                this.imports.clear();
+                
+                Promise
+                    .resolve(super.destroy(...arguments))
+                    .then(() => resolve())
+                .catch(reject);
+            }
+            catch (e) { reject(`CPU destroy failed: ${e}`) }
+        });
+    }
 
     import (view) {
-        if (view.buffer === this.buffer) {
+        if (view.buffer === this.memory.buffer) {
             return view;
         }
 
-        if (CPU.imports.has(view)) {
-            return CPU.imports.get(view);
+        if (this.imports.has(view)) {
+            return this.imports.get(view);
         }
 
         const byteLength = view.byteLength;
         const byteOffset = this.memory.malloc(byteLength);
         const bufferView = Reflect.construct(
             view.constructor, Array.of(
-                this.buffer, byteOffset, view.length
+                this.memory.buffer, byteOffset, view.length
             )
         );
 
         bufferView.set(view);
-        CPU.imports.set(view, bufferView);
+        this.imports.set(view, bufferView);
 
         return bufferView;
     }
 
     export (view) {
-        if (CPU.imports.has(view)) {
-            const dst = CPU.imports.get(view);
+        if (this.imports.has(view)) {
+            const dst = this.imports.get(view);
             if (dst !== view) {
                 dst.set(view);
             }
@@ -595,7 +749,9 @@ export class CPU extends PU {
         return view;
     }
 
-    async calc ( op, funcref, source, values, target = source ) {
+    async calc ( options, source, values, target = source ) {
+        super.lock( arguments );
+
         return new Promise(async (resolve, reject) => {
             const src = this.import(source);
             const val = this.import(values);
@@ -618,9 +774,9 @@ export class CPU extends PU {
                 this.workers.forEach(worker => {
                     const { promise, resolve: done, reject: fail } = Promise.withResolvers();
 
-                    worker.settle([
+                    worker.settask([
                         1,
-                        funcref, 
+                        options.refIndex, 
                         srcByteOffset + workerByteOffset, length,
                         valByteOffset                   , 1,
                         dstByteOffset + workerByteOffset, length, 
@@ -637,7 +793,7 @@ export class CPU extends PU {
                 })
 
                 if (alignByteLength) {
-                    promises.push(super[op](
+                    promises.push( super[ options.funcName ](
                         src.subarray(0, alignedLength),
                         val.subarray(0, valLength),
                         dst.subarray(0, alignedLength),
@@ -650,7 +806,7 @@ export class CPU extends PU {
                     .then(() => this.export(dst))
                     .then(out => resolve(out))
                 .catch(err => reject(err))
-            .finally(() => this.release());
+            .finally(() => this.release(arguments));
         });
     }
 } 
@@ -677,63 +833,33 @@ export class GPU extends PU {
         @group(0) @binding(3) var<storage, read_write>  output: array<f32>;
 
         @compute  @workgroup_size( wsize ) 
-        fn f32_add_n ( @builtin ( global_invocation_id) id : vec3u ) {
+        fn f32_add ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = input[id.x] + value[id.x]; }
         }
             
         @compute  @workgroup_size( wsize ) 
-        fn f32_mul_n ( @builtin ( global_invocation_id) id : vec3u ) {
+        fn f32_mul ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = input[id.x] * value[id.x]; }
         }
     
         @compute  @workgroup_size( wsize ) 
-        fn f32_sub_n ( @builtin ( global_invocation_id) id : vec3u ) {
+        fn f32_sub ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = input[id.x] - value[id.x]; }
         }
     
         @compute  @workgroup_size( wsize ) 
-        fn f32_div_n ( @builtin ( global_invocation_id) id : vec3u ) {
+        fn f32_div ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = input[id.x] / value[id.x]; }
         }
     
         @compute  @workgroup_size( wsize ) 
-        fn f32_max_n ( @builtin ( global_invocation_id) id : vec3u ) {
+        fn f32_max ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = max(input[id.x], value[id.x]); }
         }
     
         @compute  @workgroup_size( wsize ) 
-        fn f32_min_n ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = min(input[id.x], value[id.x]); }
-        }
-    
-        @compute  @workgroup_size( wsize ) 
-        fn f32_add ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = input[id.x] + value[0]; }
-        }
-            
-        @compute  @workgroup_size( wsize ) 
-        fn f32_mul ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = input[id.x] * value[0]; }
-        }
-    
-        @compute  @workgroup_size( wsize ) 
-        fn f32_sub ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = input[id.x] - value[0]; }
-        }
-    
-        @compute  @workgroup_size( wsize ) 
-        fn f32_div ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = input[id.x] / value[0]; }
-        }
-    
-        @compute  @workgroup_size( wsize ) 
-        fn f32_max ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = max(input[id.x], value[0]); }
-        }
-    
-        @compute  @workgroup_size( wsize ) 
         fn f32_min ( @builtin ( global_invocation_id) id : vec3u ) {
-            if ( id.x < index ) { output[id.x] = min(input[id.x], value[0]); }
+            if ( id.x < index ) { output[id.x] = min(input[id.x], value[id.x]); }
         }
     
         @compute  @workgroup_size( wsize ) 
@@ -760,107 +886,177 @@ export class GPU extends PU {
         fn f32_floor ( @builtin ( global_invocation_id) id : vec3u ) {
             if ( id.x < index ) { output[id.x] = floor(input[id.x]); }
         }
+
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vadd ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = input[id.x] + value[0]; }
+        }
+            
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vmul ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = input[id.x] * value[0]; }
+        }
+    
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vsub ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = input[id.x] - value[0]; }
+        }
+    
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vdiv ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = input[id.x] / value[0]; }
+        }
+    
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vmax ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = max(input[id.x], value[0]); }
+        }
+    
+        @compute  @workgroup_size( wsize ) 
+        fn f32_vmin ( @builtin ( global_invocation_id) id : vec3u ) {
+            if ( id.x < index ) { output[id.x] = min(input[id.x], value[0]); }
+        }
     `);
 
-    constructor () {
-        super();
+    pipelines = new Map();
+    vpipelines = new Map();
 
-        navigator.gpu
+    async acquireDevice () { 
+        return navigator.gpu
             .requestAdapter({ powerPreference: "high-performance" })
-                .then(adapter => adapter.requestDevice())
-                .then(device => {
-                    this.device         = device;
-                    this.deviceQueue    = device.queue;
-                    this.bindingSize    = device.limits.maxStorageBufferBindingSize;
-                    this.workgroupSize  = device.limits.maxComputeWorkgroupsPerDimension;
-                    this.invocations    = device.limits.maxComputeInvocationsPerWorkgroup;
-                        
-                    this.indexBuffer    = device.createBuffer({ size : 256, usage : GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-                    this.valueBuffer    = device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_DST }),
-                    this.inputBuffer    = device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_DST }),
-                    this.outputBuffer   = device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_SRC }),
-                    this.stagingBuffer  = device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-            
-                    const bindLayout    = device.createBindGroupLayout({
-                        label: "gpubg",
-                        entries: [
-                            { label: "index",  binding : 0, visibility : GPUShaderStage.COMPUTE, buffer : { type: "uniform" } },
-                            { label: "value",  binding : 1, visibility : GPUShaderStage.COMPUTE, buffer : { type: "read-only-storage" } },
-                            { label: "input",  binding : 2, visibility : GPUShaderStage.COMPUTE, buffer : { type: "read-only-storage" } },
-                            { label: "output", binding : 3, visibility : GPUShaderStage.COMPUTE, buffer : { type: "storage" } },
-                        ]
-                    });
-            
-                    this.bindGroup      = device.createBindGroup({
-                        layout  : bindLayout, 
-                        entries : [
-                            { label: "index",  binding : 0, resource : { buffer: this.indexBuffer } },
-                            { label: "value",  binding : 1, resource : { buffer: this.valueBuffer } },
-                            { label: "input",  binding : 2, resource : { buffer: this.inputBuffer } },
-                            { label: "output", binding : 3, resource : { buffer: this.outputBuffer } },
-                        ]
-                    });
-            
-                    const module = device.createShaderModule({ code: this.constructor.shader });
-                    const layout = device.createPipelineLayout({ bindGroupLayouts : [ bindLayout ] });
-            
-                    const f32_add   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_add" }});
-                    const f32_mul   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_mul" }});
-                    const f32_sub   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sub" }});
-                    const f32_div   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_div" }});
-                    const f32_max   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_max" }});
-                    const f32_min   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_min" }});
-                    const f32_neg   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_neg" }});
-                    const f32_abs   = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_abs" }});
-                    const f32_sqrt  = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sqrt" }});
-                    const f32_ceil  = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_ceil" }});
-                    const f32_floor = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_floor" }});
-
-                    f32_add.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_add_n" }});
-                    f32_mul.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_mul_n" }});
-                    f32_sub.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sub_n" }});
-                    f32_div.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_div_n" }});
-                    f32_max.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_max_n" }});
-                    f32_min.n = device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_min_n" }});
-
-                    this.maxBufferSize = this.workgroupSize * this.invocations;
-                    
-                    const handlers = {
-                        f32_add   : this.calc.bind( this, f32_add ),
-                        f32_mul   : this.calc.bind( this, f32_mul ),
-                        f32_sub   : this.calc.bind( this, f32_sub ),
-                        f32_div   : this.calc.bind( this, f32_div ),
-                        f32_max   : this.calc.bind( this, f32_max ),
-                        f32_min   : this.calc.bind( this, f32_min ),
-                        f32_neg   : this.calc.bind( this, f32_neg ),
-                        f32_abs   : this.calc.bind( this, f32_abs ),
-                        f32_sqrt  : this.calc.bind( this, f32_sqrt ),
-                        f32_ceil  : this.calc.bind( this, f32_ceil ),
-                        f32_floor : this.calc.bind( this, f32_floor ),
-                    };
-
-                    this.enable(handlers);
-                })
-            .catch(e => this.error(`GPU failed: ${e}`))
-        .finally(() => this.check());
+                .then(adapter => this.adapter = adapter)
+                .then(() => this.adapter.requestDevice())
+                .then(device => this.device = device)
+        ;
+    }
+    
+    createBuffers () {
+        this.bindingSize    = this.device.limits.maxStorageBufferBindingSize;
+        this.workgroupSize  = this.device.limits.maxComputeWorkgroupsPerDimension;
+        this.invocations    = this.device.limits.maxComputeInvocationsPerWorkgroup;
+        
+        this.indexBuffer    = this.device.createBuffer({ size : 256, usage : GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        this.valueBuffer    = this.device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_DST }),
+        this.inputBuffer    = this.device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_DST }),
+        this.outputBuffer   = this.device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.STORAGE  | GPUBufferUsage.COPY_SRC }),
+        this.stagingBuffer  = this.device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     }
 
-    calc ( pipeline, source, values, target = source ) {
-        return new Promise((resolve, reject) => {
+    createPipelines () {
 
-            if (values.length > 1) {
-                pipeline = pipeline.n;
-            }
-                        
+        this.bindLayout    = this.device.createBindGroupLayout({
+            label: "gpubg",
+            entries: [
+                { label: "index",  binding : 0, visibility : GPUShaderStage.COMPUTE, buffer : { type: "uniform" } },
+                { label: "value",  binding : 1, visibility : GPUShaderStage.COMPUTE, buffer : { type: "read-only-storage" } },
+                { label: "input",  binding : 2, visibility : GPUShaderStage.COMPUTE, buffer : { type: "read-only-storage" } },
+                { label: "output", binding : 3, visibility : GPUShaderStage.COMPUTE, buffer : { type: "storage" } },
+            ]
+        });
+        
+        this.bindGroup      = this.device.createBindGroup({
+            layout  : this.bindLayout, 
+            entries : [
+                { label: "index",  binding : 0, resource : { buffer: this.indexBuffer } },
+                { label: "value",  binding : 1, resource : { buffer: this.valueBuffer } },
+                { label: "input",  binding : 2, resource : { buffer: this.inputBuffer } },
+                { label: "output", binding : 3, resource : { buffer: this.outputBuffer } },
+            ]
+        });
+
+        const module = this.device.createShaderModule({ code: this.constructor.shader });
+        const layout = this.device.createPipelineLayout({ bindGroupLayouts : [ this.bindLayout ] });
+
+        this.pipelines.set("f32_add"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_add"   }, label: "f32_add"}));
+        this.pipelines.set("f32_mul"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_mul"   }, label: "f32_mul"}));
+        this.pipelines.set("f32_sub"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sub"   }, label: "f32_sub"}));
+        this.pipelines.set("f32_div"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_div"   }, label: "f32_div"}));
+        this.pipelines.set("f32_max"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_max"   }, label: "f32_max"}));
+        this.pipelines.set("f32_min"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_min"   }, label: "f32_min"}));
+        this.pipelines.set("f32_neg"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_neg"   }, label: "f32_neg"}));
+        this.pipelines.set("f32_abs"  , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_abs"   }, label: "f32_abs"}));
+        this.pipelines.set("f32_sqrt" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sqrt"  }, label: "f32_sqrt"}));
+        this.pipelines.set("f32_ceil" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_ceil"  }, label: "f32_ceil"}));
+        this.pipelines.set("f32_floor", this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_floor" }, label: "f32_floor"}));
+        this.vpipelines.set("f32_add" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vadd"  }, label: "f32_vadd"}));
+        this.vpipelines.set("f32_mul" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vmul"  }, label: "f32_vmul"}));
+        this.vpipelines.set("f32_sub" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vsub"  }, label: "f32_vsub"}));
+        this.vpipelines.set("f32_div" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vdiv"  }, label: "f32_vdiv"}));
+        this.vpipelines.set("f32_max" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vmax"  }, label: "f32_vmax"}));
+        this.vpipelines.set("f32_min" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vmin"  }, label: "f32_vmin"}));
+
+        this.vpipelines.set("f32_neg",  this.pipelines.get("f32_neg"));
+        this.vpipelines.set("f32_abs",  this.pipelines.get("f32_abs"));
+        this.vpipelines.set("f32_sqrt", this.pipelines.get("f32_sqrt"));
+        this.vpipelines.set("f32_ceil", this.pipelines.get("f32_ceil"));
+        this.vpipelines.set("f32_floor",this.pipelines.get("f32_floor"));
+
+        this.pipelines.set("f32_vadd",  this.vpipelines.get("f32_add"));
+        this.pipelines.set("f32_vmul",  this.vpipelines.get("f32_mul"));
+        this.pipelines.set("f32_vsub",  this.vpipelines.get("f32_sub"));
+        this.pipelines.set("f32_vdiv",  this.vpipelines.get("f32_div"));
+        this.pipelines.set("f32_vmax",  this.vpipelines.get("f32_max"));
+        this.pipelines.set("f32_vmin",  this.vpipelines.get("f32_min"));
+    }
+
+    createHandlers () {
+        this.handlers.f32_add   = this.calc.bind( this, {funcName: "f32_add"} );
+        this.handlers.f32_mul   = this.calc.bind( this, {funcName: "f32_mul"} );
+        this.handlers.f32_sub   = this.calc.bind( this, {funcName: "f32_sub"} );
+        this.handlers.f32_div   = this.calc.bind( this, {funcName: "f32_div"} );
+        this.handlers.f32_max   = this.calc.bind( this, {funcName: "f32_max"} );
+        this.handlers.f32_min   = this.calc.bind( this, {funcName: "f32_min"} );
+        this.handlers.f32_neg   = this.calc.bind( this, {funcName: "f32_neg"} );
+        this.handlers.f32_abs   = this.calc.bind( this, {funcName: "f32_abs"} );
+        this.handlers.f32_sqrt  = this.calc.bind( this, {funcName: "f32_sqrt"} );
+        this.handlers.f32_ceil  = this.calc.bind( this, {funcName: "f32_ceil"} );
+        this.handlers.f32_floor = this.calc.bind( this, {funcName: "f32_floor"} );
+        this.handlers.f32_vadd  = this.calc.bind( this, {funcName: "f32_vadd"} );
+        this.handlers.f32_vmul  = this.calc.bind( this, {funcName: "f32_vmul"} );
+        this.handlers.f32_vsub  = this.calc.bind( this, {funcName: "f32_vsub"} );
+        this.handlers.f32_vdiv  = this.calc.bind( this, {funcName: "f32_vdiv"} );
+        this.handlers.f32_vmax  = this.calc.bind( this, {funcName: "f32_vmax"} );
+        this.handlers.f32_vmin  = this.calc.bind( this, {funcName: "f32_vmin"} );
+    }
+
+    async create () {
+        return new Promise(async (resolve, reject) => {
+            this.acquireDevice()
+                    .then(() => this.createBuffers())
+                    .then(() => this.createPipelines())
+                    .then(() => resolve())
+                .catch((err) => reject(`GPU failed: ${err}`))
+            .finally(() => super.create(...arguments));
+        });
+    }
+
+    async destroy () {
+        super.destroy(...arguments)
+    }
+
+    async calc ( options, source, values, target = source ) {
+        super.lock( arguments );
+
+        return new Promise((resolve, reject) => {
+            
             const byteLength        = target.byteLength;
             const commandEncoder    = this.device.createCommandEncoder();
             const passEncoder       = commandEncoder.beginComputePass();
     
-            this.deviceQueue.writeBuffer(this.indexBuffer, 0, Uint32Array.of(target.length));
-            this.deviceQueue.writeBuffer(this.valueBuffer, 0, values);
-            this.deviceQueue.writeBuffer(this.inputBuffer, 0, source);
+            this.device.queue.writeBuffer(this.indexBuffer, 0, Uint32Array.of(target.length));
+            this.device.queue.writeBuffer(this.valueBuffer, 0, values);
+            this.device.queue.writeBuffer(this.inputBuffer, 0, source);
+            
+            if (values.length === 1) {
+                passEncoder.setPipeline( this.vpipelines.get(options.funcName) );
+            }
+            else if (source.length === target.length) {
+                passEncoder.setPipeline( this.pipelines.get(options.funcName) );
+            }
+            else {
+                return reject(`Error: Source length (${source.length}) must be 1 or equal to target length (${target.length}).`)
+            }
     
-            passEncoder.setPipeline( pipeline );
             passEncoder.setBindGroup(0, this.bindGroup);
             passEncoder.dispatchWorkgroups( this.workgroupSize, this.invocations );
             passEncoder.end();
@@ -870,19 +1066,19 @@ export class GPU extends PU {
                 this.stagingBuffer, 0, byteLength
             );
             
-            this.deviceQueue.submit([commandEncoder.finish()]);
+            this.device.queue.submit([commandEncoder.finish()]);
     
             const output = new Uint8Array(
                 target.buffer, target.byteOffset, byteLength
             );
             
-            return this.stagingBuffer
+            this.stagingBuffer
                 .mapAsync(GPUMapMode.READ, 0, byteLength)
                     .then(() => this.stagingBuffer.getMappedRange(0, byteLength))
                     .then(buffer => output.set( new Uint8Array( buffer ) ))
                     .then(() => resolve(target))
                 .catch(error => reject(error))
-            .finally(() => this.release());
+            .finally(() => this.release(arguments));
         });
     }
 
@@ -891,56 +1087,66 @@ export class GPU extends PU {
             this.stagingBuffer.unmap();
         }
         
-        super.release();
+        super.release(arguments);
     }
-}
+};
 
 export class NPU extends PU {
 
-    constructor () {
-        super();
-
-        navigator.ml
+    async create () {
+        return this.context ?? navigator.ml
             .createContext({ powerPreference: "default"})
-                .then(context => {
-                    this.context = context;
-
-                    const handlers = {
-                        f32_add   : this.calc.bind(this, MLGraphBuilder.prototype.add, "float32" ),
-                        f32_mul   : this.calc.bind(this, MLGraphBuilder.prototype.mul, "float32" ),
-                        f32_sub   : this.calc.bind(this, MLGraphBuilder.prototype.sub, "float32" ),
-                        f32_div   : this.calc.bind(this, MLGraphBuilder.prototype.div, "float32" ),
-                        f32_max   : this.calc.bind(this, MLGraphBuilder.prototype.max, "float32" ),
-                        f32_min   : this.calc.bind(this, MLGraphBuilder.prototype.min, "float32" ),
-                        f32_neg   : this.calc.bind(this, MLGraphBuilder.prototype.neg, "float32" ),
-                        f32_abs   : this.calc.bind(this, MLGraphBuilder.prototype.abs, "float32" ),
-                        f32_sqrt  : this.calc.bind(this, MLGraphBuilder.prototype.sqrt, "float32" ),
-                        f32_ceil  : this.calc.bind(this, MLGraphBuilder.prototype.ceil, "float32" ),
-                        f32_floor : this.calc.bind(this, MLGraphBuilder.prototype.floor, "float32" ),
-                    };
-
-                    this.enable(handlers);
-                })
-            .catch((err) => this.error(err))
-        .finally(() => this.check());
+            .then(context => this.context = context)
+        .finally(() => super.create(...arguments))
     }
 
-    calc ( builder, dataType, source, values, target = source ) {
-        return new Promise((resolve, reject) => {
+    async destroy () {
+        try {
+            this.context?.destroy();
+            Reflect.deleteProperty(this, "context");
+        }
+        catch (e) {}
+        finally { super.release(arguments); }
+    }
+
+    createHandlers () {
+        this.handlers.f32_add   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.add, dataType: "float32" } );
+        this.handlers.f32_mul   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.mul, dataType: "float32" } );
+        this.handlers.f32_sub   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.sub, dataType: "float32" } );
+        this.handlers.f32_div   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.div, dataType: "float32" } );
+        this.handlers.f32_max   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.max, dataType: "float32" } );
+        this.handlers.f32_min   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.min, dataType: "float32" } );
+        this.handlers.f32_neg   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.neg, dataType: "float32" } );
+        this.handlers.f32_abs   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.abs, dataType: "float32" } );
+        this.handlers.f32_sqrt  = this.calc.bind(this, { builder: MLGraphBuilder.prototype.sqrt, dataType: "float32" } );
+        this.handlers.f32_ceil  = this.calc.bind(this, { builder: MLGraphBuilder.prototype.ceil, dataType: "float32" } );
+        this.handlers.f32_floor = this.calc.bind(this, { builder: MLGraphBuilder.prototype.floor, dataType: "float32" } );
+        this.handlers.f32_vadd  = this.handlers.f32_add;
+        this.handlers.f32_vmul  = this.handlers.f32_mul;
+        this.handlers.f32_vsub  = this.handlers.f32_sub;
+        this.handlers.f32_vdiv  = this.handlers.f32_div;
+        this.handlers.f32_vmax  = this.handlers.f32_max;
+        this.handlers.f32_vmin  = this.handlers.f32_min;
+    }
+
+    async calc ( options, source, values, target = source ) {
+        super.lock( arguments );
+        
+        return new Promise(async (resolve, reject) => {
             const graphBuilder  = new MLGraphBuilder( this.context );
             const buildOptions  = {
                 dst : Reflect.apply(
-                    builder, graphBuilder, Array.of(
-                        graphBuilder.input( 'src', { dataType, shape: [ source.length ] }),
-                        graphBuilder.input( 'val', { dataType, shape: [ values.length ] })
+                    options.builder, graphBuilder, Array.of(
+                        graphBuilder.input( 'src', { dataType: options.dataType, shape: [ source.length ] }),
+                        graphBuilder.input( 'val', { dataType: options.dataType, shape: [ values.length ] })
                     )
                 )
             };
 
             const createTensors = () => Promise.all([
-                this.context.createTensor({ dataType, shape: [ target.length ], readable: true }),
-                this.context.createTensor({ dataType, shape: [ source.length ], writable: true }),
-                this.context.createTensor({ dataType, shape: [ values.length ], writable: true }),
+                this.context.createTensor({ dataType: options.dataType, shape: [ target.length ], readable: true }),
+                this.context.createTensor({ dataType: options.dataType, shape: [ source.length ], writable: true }),
+                this.context.createTensor({ dataType: options.dataType, shape: [ values.length ], writable: true }),
             ]);
 
             graphBuilder
@@ -950,7 +1156,7 @@ export class NPU extends PU {
                     .then(out       => this.context.readTensor( out, target ))
                     .then(()        => resolve(target))
                 .catch(error => reject(error))
-            .finally(() => this.release());
+            .finally(() => this.release(arguments));
         });
     }
 
@@ -965,11 +1171,13 @@ export class NPU extends PU {
     }
 
     release () {
-        this.graph.destroy();
-        Reflect.deleteProperty(this, "graph");
-        super.release();
-    }
-    
+        try {
+            this.graph?.destroy();
+            Reflect.deleteProperty(this, "graph");
+        }
+        catch (e) {}
+        finally { super.release(arguments); }
+    }    
 }
 
 export default class IPU extends EventTarget {
@@ -988,11 +1196,11 @@ export default class IPU extends EventTarget {
             sub     : { value : function ( value, target = this ) { return ipu.calc( "f32_sub", target, this, value ); } },
             max     : { value : function ( value, target = this ) { return ipu.calc( "f32_max", target, this, value ); } },
             min     : { value : function ( value, target = this ) { return ipu.calc( "f32_min", target, this, value ); } },
-            neg     : { value : function ( target = this ) { return ipu.calc( "f32_neg",   target, this ); } },
-            abs     : { value : function ( target = this ) { return ipu.calc( "f32_abs",   target, this ); } },
-            sqrt    : { value : function ( target = this ) { return ipu.calc( "f32_sqrt",  target, this ); } },
-            ceil    : { value : function ( target = this ) { return ipu.calc( "f32_ceil",  target, this ); } },
-            floor   : { value : function ( target = this ) { return ipu.calc( "f32_floor", target, this ); } },
+            neg     : { value : function ( target = this )        { return ipu.calc( "f32_neg",   target, this ); } },
+            abs     : { value : function ( target = this )        { return ipu.calc( "f32_abs",   target, this ); } },
+            sqrt    : { value : function ( target = this )        { return ipu.calc( "f32_sqrt",  target, this ); } },
+            ceil    : { value : function ( target = this )        { return ipu.calc( "f32_ceil",  target, this ); } },
+            floor   : { value : function ( target = this )        { return ipu.calc( "f32_floor", target, this ); } },
         });
     }
 
