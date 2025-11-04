@@ -1,15 +1,15 @@
 (module
     (import "env" "memory" (memory 0x00010000 0x00010000 shared))
 
-    (func $f32_add (export "f32_add")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
+    (func $f32_add (export "f32_add")        
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
         (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -135,14 +135,14 @@
     )
 
     (func $f32_sub (export "f32_sub")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
-        (param $valLength i32)        
+        (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)       
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -268,14 +268,14 @@
     )
 
     (func $f32_mul (export "f32_mul")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
-        (param $valLength i32)        
+        (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)     
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -401,14 +401,14 @@
     )
 
     (func $f32_div (export "f32_div")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
-        (param $valLength i32)       
+        (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)    
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -534,14 +534,14 @@
     )
 
     (func $f32_min (export "f32_min")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
         (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)      
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -667,14 +667,14 @@
     )
 
     (func $f32_max (export "f32_max")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
 
         (param $valByteOffset i32)
         (param $valLength i32)         
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)        
 
         (local $splat v128)   
         (local $iterate v128)   
@@ -800,11 +800,11 @@
     )
 
     (func $f32_abs (export "f32_abs")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $iterate v128)   
 
@@ -865,11 +865,11 @@
     )
 
     (func $f32_neg (export "f32_neg")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $iterate v128)   
 
@@ -930,11 +930,11 @@
     )
 
     (func $f32_sqrt (export "f32_sqrt")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $iterate v128)   
 
@@ -995,11 +995,11 @@
     )
 
     (func $f32_ceil (export "f32_ceil")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $iterate v128)   
 
@@ -1060,11 +1060,11 @@
     )
 
     (func $f32_floor (export "f32_floor")
-        (param $dstByteOffset i32)
-        (param $dstLength i32)
-
         (param $srcByteOffset i32)
         (param $srcLength i32)
+
+        (param $dstByteOffset i32)
+        (param $dstLength i32)
 
         (local $iterate v128)   
 
@@ -1123,4 +1123,13 @@
 
         (unreachable)
     )
+
+    (elem (i32.const 0) funcref 
+        (ref.func $f32_add) 
+        (ref.func $f32_sub) 
+        (ref.func $f32_mul) 
+        (ref.func $f32_div)
+    )
+    
+    (table (export "func") 100 funcref)
 )

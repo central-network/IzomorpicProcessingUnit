@@ -4,7 +4,7 @@
     import LocalSharedMemory from "./node_modules/localsharedmemory/index.js"
     import { GPU, NPU, CPU } from "./index.js"
     
-    const source = new Float32Array(46).map(Math.random)
+    const source = new Float32Array(2e5).map(Math.random)
     const values = Float32Array.of(2.4)
     
     const npu = new NPU();
@@ -12,7 +12,7 @@
         console.warn("npu ready:", npu)
 
         const target = new Float32Array(source.length);
-        const result = await npu.f32_add( source, values, target );
+        const result = await npu.f32_mul( source, values, target );
         
         console.log("npu results:", result)
     });
@@ -22,7 +22,7 @@
         console.warn("gpu ready:", gpu)
 
         const target = new Float32Array(source.length);
-        const result = await gpu.f32_add( source, values, target );
+        const result = await gpu.f32_mul( source, values, target );
 
         console.log("gpu results:", result)
     });
@@ -32,9 +32,14 @@
         console.warn("cpu ready:", cpu)
 
         const target = new Float32Array(source.length);
-        const result = await cpu.f32_add( source, values, target );
+        const result = await cpu.f32_mul( source, values, target );
 
         console.log("cpu results:", result)
+
+        setTimeout(async () => {
+            const result = await cpu.f32_add( source, values, target );
+            console.log("cpu results:", result)
+        }, 1000)
     });
 
 </script>

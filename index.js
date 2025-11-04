@@ -405,11 +405,6 @@ export class PU extends EventTarget {
 
 export class CPU extends PU {
 
-    static wasm = Uint8Array.from(
-        "0061736d0100000001110260067f7f7f7f7f7f0060047f7f7f7f0002140103656e76066d656d6f72790203808004808004030c0b000000000000010101010107730b076633325f6164640000076633325f7375620001076633325f6d756c0002076633325f6469760003076633325f6d696e0004076633325f6d61780005076633325f6162730006076633325f6e65670007086633325f737172740008086633325f6365696c0009096633325f666c6f6f72000a0a8f180bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde401fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0092380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde401fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70292380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde501fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0093380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde501fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70293380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde601fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0094380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde601fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70294380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde701fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0095380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde701fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70295380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde801fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0096380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde801fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70296380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072000fd1c002002fd1c012004fd1c022001fd1c032107410120054604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde901fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0097380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2005200146044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde901fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70297380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bae0101017b20042000fd1c002002fd1c012003fd1c022001fd1c0321042003200146044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde001fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028b380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042000fd1c002002fd1c012003fd1c022001fd1c0321042003200146044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde101fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028c380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042000fd1c002002fd1c012003fd1c022001fd1c0321042003200146044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde301fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b70291380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042000fd1c002002fd1c012003fd1c022001fd1c0321042003200146044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd67fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028d380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042000fd1c002002fd1c012003fd1c022001fd1c0321042003200146044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd68fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028e380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000b"
-        .match(/(..)/g).map(v => parseInt(v, 16))
-    ).buffer;
-
     static get memory () {
         const memory = new WebAssembly.Memory({initial: 100, maximum: 100, shared: true});
         const atomic = new Uint32Array(memory.buffer);
@@ -431,6 +426,70 @@ export class CPU extends PU {
         return memory;
     }
 
+    static wasm = Uint8Array.from(
+        "0061736d0100000001110260067f7f7f7f7f7f0060047f7f7f7f0002140103656e76066d656d6f72790203808004808004030c0b0000000000000101010101040401700064077a0c076633325f6164640000076633325f7375620001076633325f6d756c0002076633325f6469760003076633325f6d696e0004076633325f6d61780005076633325f6162730006076633325f6e65670007086633325f737172740008086633325f6365696c0009096633325f666c6f6f72000a0466756e630100090a010041000b04000102030a8f180bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde401fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0092380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde401fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70292380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde501fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0093380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde501fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70293380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde601fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0094380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde601fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70294380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde701fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0095380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde701fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70295380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde801fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0096380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde801fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70296380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde901fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0097380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde901fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70297380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde001fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028b380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde101fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028c380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde301fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b70291380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd67fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028d380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd68fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028e380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000b"
+        .match(/(..)/g).map(v => parseInt(v, 16))
+    ).buffer;
+
+    static workerURL = URL.createObjectURL(
+        new Blob([`(`, () => {
+                self.onmessage = e => {
+                    const { memory, module, buffer } = e.data;
+                    const atomic = new Int32Array(buffer);
+                    const args = atomic.subarray(2);
+                    const f = atomic.at.bind(atomic, 1);
+                    const pid = Number(name)
+                    WebAssembly
+                    .instantiate(module, {env: {memory}})
+                        .then(({exports: {func}}) => {
+                            postMessage(pid);
+                            let cycle = 0;
+                            while (++cycle) {
+                                Atomics.store(atomic, 0, 0);
+                                Atomics.wait(atomic, 0);
+                                func.get(atomic[1]).apply(null, args);
+                                postMessage(null);
+                            }
+                        })
+                    .catch((err) => postMessage(err))
+                }
+            }, `)`, `()`
+        ])
+    );
+
+    workers     = new Map();
+    concurrency = navigator.hardwareConcurrency
+
+    fork () {
+        return new Promise((resolve, reject) => {
+            const pid    = this.workers.size + 1;
+            const worker = new Worker(CPU.workerURL, {name: pid});
+            const buffer = new SharedArrayBuffer(8*4);
+            const atomic = new Int32Array(buffer);
+            
+            worker.postMessage({
+                module: this.module,
+                memory: this.memory, 
+                buffer: buffer
+            });
+
+            Object.defineProperty(worker, "pid",    { value: pid })
+            Object.defineProperty(worker, "atomic", { value: atomic })
+            Object.defineProperty(worker, "settle", { value: Int32Array.prototype.set.bind(atomic) })
+            Object.defineProperty(worker, "unlock", { value: Atomics.notify.bind(Atomics, atomic, 0, 1, 1) })
+    
+            worker.addEventListener(
+                "message", e => {
+                    if (e.data != pid)
+                        return reject(pid)
+                    else resolve(pid)
+                }, {once: true}
+            );
+
+            this.workers.set(pid, worker);
+        })
+    }
+
     constructor (memory = new.target.memory) {
         super()
         
@@ -438,24 +497,25 @@ export class CPU extends PU {
         this.buffer = memory.buffer;
 
         try {
-            const wasm = replaceWASM(CPU.wasm, this.memory);
-            const opts = {env: {memory: this.memory}};
-
+            const wasm          = replaceWASM(CPU.wasm, this.memory);
+            const handlers      = new Object(null);
+            const concurrency   = this.concurrency;
+            const promises      = new Array(concurrency).fill();
+            
             WebAssembly
-                .instantiate(wasm, opts)
-                    .then(ws => {
-                        const handlers = new Object(null);
-
-                        for(const func in ws.instance.exports) {
-                            handlers[ func ] = this.calc.bind(
-                                this, ws.instance.exports[ func ]
-                            );
-                        }
-
-                        this.enable(handlers);
-                    })
-                .catch(e => this.warn(`WebAssembly not instantiated: ${e}`))
-            .finally(() => this.check());
+                .compile(wasm)
+                    .then(module => this.module = module)
+                    .then(() => Promise.all(promises.map(() => this.fork())))
+                    .then(() => 
+                        WebAssembly.Module.exports(this.module).values().forEach((e, i) => {
+                            if (e.kind === "function" && Reflect.has(PU.prototype, e.name)) {
+                                handlers[ e.name ] = this.calc.bind(this, e.name, i);
+                            }
+                        })
+                    )
+                    .then(() => this.enable(handlers))
+                    .catch(e => this.warn(`WebAssembly not instantiated: ${e}`))
+                .finally(() => this.check());
         }   
         catch (e) { this.error(`WebAssembly not supported: ${e}`)}
     }
@@ -499,9 +559,15 @@ export class CPU extends PU {
         }
     }
 
+    static imports = new WeakMap();
+
     import (view) {
         if (view.buffer === this.buffer) {
             return view;
+        }
+
+        if (CPU.imports.has(view)) {
+            return CPU.imports.get(view);
         }
 
         const byteLength = view.byteLength;
@@ -512,44 +578,80 @@ export class CPU extends PU {
             )
         );
 
-        bufferView.set( view );
+        bufferView.set(view);
+        CPU.imports.set(view, bufferView);
 
         return bufferView;
     }
 
-    export (view, byteOffset) {
-        if (view.buffer !== this.buffer) {
-            view.set(
-                Reflect.construct(
-                    view.constructor, Array.of(
-                        this.buffer, byteOffset, view.length
-                    )
-                )
-            );
+    export (view) {
+        if (CPU.imports.has(view)) {
+            const dst = CPU.imports.get(view);
+            if (dst !== view) {
+                dst.set(view);
+            }
+            return dst;
         }
+        return view;
     }
 
-    calc ( handler, source, values, target = source ) {
+    async calc ( op, funcref, source, values, target = source ) {
         return new Promise(async (resolve, reject) => {
-            try {
-                const { byteOffset: srcByteOffset, length: srcLength } = this.import(source);
-                const { byteOffset: valByteOffset, length: valLength } = this.import(values);
-                const { byteOffset: dstByteOffset, length: dstLength } = this.import(target);
-        
-                await handler(
-                    dstByteOffset, dstLength, 
-                    srcByteOffset, srcLength, 
-                    valByteOffset, valLength
-                );
+            const src = this.import(source);
+            const val = this.import(values);
+            const dst = this.import(target);
 
-                this.export(
-                     target, dstByteOffset 
-                );
+            const { byteOffset: srcByteOffset, length: srcLength } = src;
+            const { byteOffset: valByteOffset, length: valLength } = val;
+            const { byteOffset: dstByteOffset, length: dstLength } = dst;
+    
+            const promises          = new Array();
+            const concurrency       = this.workers.size;
+            const alignByteLength   = (dst.byteLength) % (16 * concurrency);
+            const byteLength        = (dst.byteLength - alignByteLength) / concurrency;
+            const length            = (byteLength / dst.BYTES_PER_ELEMENT);
+            const alignedLength     = (alignByteLength / dst.BYTES_PER_ELEMENT);
+            
+            let workerByteOffset    = (alignByteLength);
+            
+            if (valLength === 1) {
+                this.workers.forEach(worker => {
+                    const { promise, resolve: done, reject: fail } = Promise.withResolvers();
 
-                resolve(target)
+                    worker.settle([
+                        1,
+                        funcref, 
+                        srcByteOffset + workerByteOffset, length,
+                        valByteOffset                   , 1,
+                        dstByteOffset + workerByteOffset, length, 
+                    ]);
 
-            } catch (error) { reject(error) }
-        })
+                    workerByteOffset += byteLength;
+    
+                    worker.addEventListener("error", fail, {once: true});
+                    worker.addEventListener("message", done, {once: true});
+                    worker.addEventListener("messageerror", fail, {once: true});
+    
+                    worker.unlock();
+                    promises.push(promise);
+                })
+
+                if (alignByteLength) {
+                    promises.push(super[op](
+                        src.subarray(0, alignedLength),
+                        val.subarray(0, valLength),
+                        dst.subarray(0, alignedLength),
+                    ));
+                }
+            }
+
+            return Promise
+                .all(promises)
+                    .then(() => this.export(dst))
+                    .then(out => resolve(out))
+                .catch(err => reject(err))
+            .finally(() => this.release());
+        });
     }
 } 
 
