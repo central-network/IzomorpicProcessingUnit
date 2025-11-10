@@ -1,0 +1,48 @@
+<meta charset="utf8" />
+
+<script type="module">
+    import LocalSharedMemory from "./node_modules/localsharedmemory/index.js"
+    import { GPU, NPU, CPU, WPU } from "./index.js"
+    
+    const source = new Float32Array(8e5).map(Math.random);
+    const values = Float32Array.of(2.4);
+
+    const wpu = new WPU();
+
+    wpu.create();
+
+    let transport = new WebTransport("https://cen.net:4433/remote-processor-a");
+    await transport.ready;
+
+    console.warn(transport);
+    console.warn("remote-processor-a!");
+
+    const bds    = transport.incomingBidirectionalStreams;
+    const reader = bds.getReader();
+    console.warn("reader:", reader);
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) { break; }
+
+        // value is an instance of WebTransportBidirectionalStream
+        console.warn("read:", value);
+        await readData(value.readable);
+    }
+    
+    async function readData(readable) {
+        const reader = readable.getReader();
+        console.warn("reader:", reader);
+        while (true) {
+            const { value, done } = await reader.read();
+            console.warn("!remote-processor read:", value);
+            if (done) { break; }
+            // value is a Uint8Array.
+        }
+    }
+
+    const dgreader = transport.datagrams.readable.getReader();
+    const { value, done } = await dgreader.read();
+    console.warn("!remote-processor read:", value);
+
+</script>

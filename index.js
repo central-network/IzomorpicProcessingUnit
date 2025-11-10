@@ -1,44 +1,95 @@
 import enumerate from "./node_modules/niceenum/index.js"
 
-const ff = class extends Float32Array {
-    constructor ( buffer, byteOffset = 0, length = (buffer.byteLength - byteOffset)/4 ) {
-        let byteLength;
+class EventEmitter              extends EventTarget {
 
-        if (typeof buffer === "number") {
-            length      = buffer;
-            byteLength  = length * 4;
-            byteOffset  = CPU.memory.malloc(byteLength);
-            buffer      = CPU.memory.buffer;
+    static wListeners    = new WeakMap();
+    static mEventClass   = new Map();
+
+    static EventClass       (thisArg, type, tagName) {
+        if (typeof tagName === "undefined") {
+            tagName = `${thisArg.constructor.name}${type.charAt(0).toUpperCase()}${type.substring(1)}Event`;
         }
 
-        if (buffer !== CPU.memory.buffer) {
-            const tempView = new Float32Array( buffer, byteOffset, length );
-            byteLength  = tempView.byteLength;
-            byteOffset  = CPU.memory.malloc(byteLength);
-            buffer      = CPU.memory.buffer;
-            const destView = new Float32Array( buffer, byteOffset, length );
-            destView.set( tempView );
+        if (this.mEventClass.has(tagName)) {
+            return this.mEventClass.get(tagName);
         }
 
-        super( buffer, byteOffset, length );
+        const eventClass = class extends CustomEvent {
+            constructor (type, data) { super(type, {detail: data}); }
+        };
+
+        Object.defineProperty(eventClass, "name", { value: tagName });
+        Object.defineProperty(eventClass, "eventType", { value: type });
+        Object.defineProperty(eventClass.prototype, "data", { enumerable: true, get: function () { return this.detail; } });
+        Object.defineProperty(eventClass.prototype, "log", { value: function () { console.log(this, ...arguments) } });
+        Object.defineProperty(eventClass.prototype, "warn", { value: function () { console.warn(this, ...arguments) } });
+        Object.defineProperty(eventClass.prototype, "error", { value: function () { console.error(this, ...arguments) } });
+        Object.defineProperty(eventClass.prototype, Symbol.toStringTag, { value: tagName });
+
+        this.mEventClass.set(tagName, eventClass);
+
+        return eventClass;
     }
 
-    static from ( values = [], mapFn = v => v, thisArg = null ) {
-        const length        = values.length || 0;
-        const byteLength    = length * 4;
-        const byteOffset    = CPU.memory.malloc(byteLength);
-        const view          = new this(length);
-
-        view.set(values.map(mapFn, thisArg));
-        return view;
+    on                      (type, callback, options) {
+        this.addListener(type, callback, options);
+        return this;
     }
 
-    static of ( ...values ) {
-        return this.from( values );
+    once                    (type, callback, options) {
+        if (options) { options.once = true; }
+        else { options = { once: true }; }
+        return this.on(type, callback, options);
     }
-};
 
-function replaceWASM(buffer, target, offset = 0) {
+    ontype                  (type, callback = void 0) {
+        this.addListener(type, callback);
+
+        Reflect.defineProperty(this, `on${type}`, {
+            value: callback, configurable: true
+        });
+    }
+
+    emit                    (type, data = this) {
+        const event = Reflect.construct(
+            EventEmitter.EventClass(this, type),
+            Array.of(type, data)
+        );
+
+        this.dispatch(event);
+        return this;
+    }
+
+    dispatch                (event) {
+        this.dispatchEvent(event);
+    }
+
+    addListener             (type, callback, options) {
+        const handlers = this.getListeners( type );
+        if (handlers.has(callback)) { return this; }
+        handlers.add(callback);
+        this.addEventListener(type, callback, options);
+    }
+
+    getListeners            (type) {
+        if (this[ `[[Listeners]]` ].has(type) === false) {
+            this[ `[[Listeners]]` ].set(type, new WeakSet);
+        }
+
+        return this[ `[[Listeners]]` ].get(type);
+    }
+
+    removeListener          (type, callback) {
+        const handlers = this.getListeners( type );
+        if (handlers.has(callback) === false) { return this;}
+        handlers.delete(callback);
+    }
+
+    get [ `[[Listeners]]` ] () { return EventEmitter.wListeners.get(this) || (this[ `[[Listeners]]` ] = new Map); }
+    set [ `[[Listeners]]` ] ( value ) { EventEmitter.wListeners.set(this, value) }
+}
+
+const replaceWASM               = (buffer, target, offset = 0) => {
     const offsetMagic = 0x26e22a98;
     const memoryMagic = 0x00010000;
     
@@ -152,50 +203,11 @@ function replaceWASM(buffer, target, offset = 0) {
     buffer = buffer.slice(0, buffer.byteLength - croplen)
     
     return buffer;
-}
+};
 
-export const iLE = Boolean(new DataView(Uint32Array.of(1).buffer).getUint8(0));
+const fallbackHandlers          = {
 
-export const CONST = [
-    enumerate("ERROR_SOURCE_AND_TARGET_MUST_HAS_EQUAL_LENGTH"),
-    enumerate("ERROR_VALUE_LENGTH_EXCEES_SOURCE_LENGTH"),
-    enumerate("ERROR_VALUE_LENGTH_MUST_BE_ONE_OR_SRC_LENGTH"),
-    enumerate("ERROR_SOURCE_TARGET_VALUE_ALL_NEEDS_LENGTH"),
-    enumerate("FLOAT"),
-    enumerate("INT"),
-    enumerate("UINT"),
-    enumerate("BIGINT"),
-    enumerate("BIGUINT"),
-    enumerate("BIGVEC"),
-    enumerate("ADD"),
-    enumerate("MUL"),
-    enumerate("SUB"),
-    enumerate("DIV"),
-    enumerate("REM"),
-    enumerate("EQ"),
-    enumerate("MAX_EPOCH"),
-    enumerate("ANYPU"),
-    enumerate("CPU"),
-    enumerate("GPU"),
-    enumerate("NPU"),
-    enumerate("DATAVIEW"),
-    enumerate("INT8ARRAY"),
-    enumerate("INT16ARRAY"),
-    enumerate("INT32ARRAY"),
-    enumerate("BIGINT64ARRAY"),
-    enumerate("UINT8ARRAY"),
-    enumerate("UINT16ARRAY"),
-    enumerate("UINT32ARRAY"),
-    enumerate("BIGUINT64ARRAY"),
-    enumerate("BIGVEC128ARRAY"),
-    enumerate("FLOAT16ARRAY"),
-    enumerate("FLOAT32ARRAY"),
-    enumerate("FLOAT64ARRAY"),
-];
-
-export const fallbackHandlers = {
-
-    f32_vadd : async function ( source, values, target = source ) {
+    f32_vadd                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -209,7 +221,7 @@ export const fallbackHandlers = {
         });
     },
 
-    f32_add : async function ( source, values, target = source ) {
+    f32_add                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
 
@@ -228,7 +240,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_vmul : async function ( source, values, target = source ) {
+    f32_vmul                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -242,7 +254,7 @@ export const fallbackHandlers = {
         });
     },
 
-    f32_mul : async function ( source, values, target = source ) {
+    f32_mul                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -261,7 +273,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_vdiv : async function ( source, values, target = source ) {
+    f32_vdiv                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -275,7 +287,7 @@ export const fallbackHandlers = {
         });
     },
      
-    f32_div : async function ( source, values, target = source ) {
+    f32_div                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -294,7 +306,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_vsub : async function ( source, values, target = source ) {
+    f32_vsub                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -308,7 +320,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_sub : async function ( source, values, target = source ) {
+    f32_sub                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -327,7 +339,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_vmax : async function ( source, values, target = source ) {
+    f32_vmax                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -341,7 +353,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_max : async function ( source, values, target = source ) {
+    f32_max                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -360,7 +372,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_vmin : async function ( source, values, target = source ) {
+    f32_vmin                    : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -374,7 +386,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_min : async function ( source, values, target = source ) {
+    f32_min                     : async function ( source, values, target = source ) {
         return new Promise( (resolve, reject) => {
             let i = target.length;
     
@@ -393,7 +405,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_neg : async function ( options, source, target = source ) {
+    f32_neg                     : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -406,7 +418,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_abs : async function ( source, target = source ) {
+    f32_abs                     : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -419,7 +431,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_sqrt : async function ( source, target = source ) {
+    f32_sqrt                    : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -432,7 +444,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_ceil : async function ( source, target = source ) {
+    f32_ceil                    : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -445,7 +457,7 @@ export const fallbackHandlers = {
         });
     },
     
-    f32_floor : async function ( source, target = source ) {
+    f32_floor                   : async function ( source, target = source ) {
         return new Promise( (resolve, reject) => {
             
             if (source.length === target.length) {
@@ -457,67 +469,91 @@ export const fallbackHandlers = {
             reject(`Error: Source length (${source.length}) must be equal to target length (${target.length}).`)
         });
     }
-}
+};
 
-export class PUEvent extends CustomEvent {
-    constructor (type, detail) { super(type, {detail})}
-    get data () { return this.detail; }
-}
+export class PUEvent            extends CustomEvent {
 
-export class PU extends EventTarget {
-    static hardwareConcurrency = navigator.hardwareConcurrency;
-
-    handlers = {}
-
-    create      () { 
-        this.createHandlers()
-        this.settleHandlers()
-
-        this.deviceState = this.INIT;
-        this.emit("create", arguments); 
-
-        this.check();
+    constructor             (type, detail) {
+        super(type, {detail})
     }
 
-    destroy     () { 
-        this.handlers    = {};
-        this.deviceState = this.CLOSED;
-        this.emit("destroy", arguments) 
+    get data                    () {
+        return this.detail; 
+    }
+};
+
+export class PU                 extends EventTarget {
+
+    static hardwareConcurrency  = navigator.hardwareConcurrency;
+
+    constructor                 () {
+        super(...arguments);
+        
+        Object.defineProperties(this, {
+            handlers : { value: new Object() },
+        });
+    }
+
+    async init                  () {
+        return new Promise( (resolve, reject) => {
+            try {
+                this.createHandlers()
+                this.settle()
+        
+                this.deviceState = this.INIT;
+                this.emit("create", arguments); 
+        
+                this.check();
+                this.release();
+                resolve();
+            } catch (e) { reject(e); }
+        }); 
+    }
+
+    async destroy               () { 
+        return new Promise( (resolve, reject) => {
+            try {
+                this.lock();
+                this.restore();
+                this.deviceState = this.CLOSED;
+                this.emit("destroy", arguments) 
+                resolve();
+            } catch (e) { reject(e); }
+        }); 
     }
     
-    release     ( args ) { 
+    release                     (args) { 
         this.lockState = this.IDLE;
         this.emit("idle", args);
     }
 
-    lock        ( args ) {
+    lock                        (args) {
         this.lockState = this.LOCKED;
         this.emit("lock", args);
     }
 
-    error       () { this.emit("error"); }
-    ready       () { this.emit("ready"); }
+    error                       () { this.emit("error"); }
+    ready                       () { this.emit("ready"); }
 
-    log         () {   console.log(...arguments) }
-    warn        () {  console.warn(...arguments) }
-    catch       () { console.error(...arguments) }
-    error       () { console.error(...arguments) }
+    log                         () {   console.log(...arguments) }
+    warn                        () {  console.warn(...arguments) }
+    catch                       () { console.error(...arguments) }
+    error                       () { console.error(...arguments) }
 
-    on          () { return this.addEventListener(...arguments), this; }
-    once        () { return this.addEventListener(...arguments, {once: true}), this; }
-    emit        () { return this.dispatchEvent(new PUEvent(...arguments)), this; }
+    on                          () { return this.addEventListener(...arguments), this; }
+    once                        () { return this.addEventListener(...arguments, {once: true}), this; }
+    emit                        () { return this.dispatchEvent(new PUEvent(...arguments)), this; }
 
-    check () {
-        this.lockState   = this.IDLE;
+    check                       () {
         this.deviceState = this.READY;
         this.emit("ready");
     }
 
-    createHandlers () {
+    createHandlers              () {
         throw `PU class need has own create handlers function!`
     }
 
-    settleHandlers () {
+    settle                      () {
         const properties = {};
         const prototype = Object.getPrototypeOf(this);
         
@@ -531,87 +567,22 @@ export class PU extends EventTarget {
         Object.defineProperties(prototype, properties);
     }
 
-    restore () {
+    restore                     () {
         for (const name in this.handlers) {
             Reflect.deleteProperty(this, name);
         }
         this.emit("restore", this.handlers);
     }
 
-    async calc (options, ...args) {
+    async calc                  (options, ...args) {
         const handler = fallbackHandlers[ options.funcName ];
         return Reflect.apply( handler, this, args );
     }
-} 
+}; 
 
-Object.defineProperties(PU.prototype, {
-    IDLE    : { value: enumerate("IDLE") },
-    BUSY    : { value: enumerate("BUSY") },
-    READY   : { value: enumerate("READY") },
-    LOCKED  : { value: enumerate("LOCKED") },
-    CLOSED  : { value: enumerate("CLOSED") },
-    INIT    : { value: enumerate("INIT") },
-});
+export class CPU                extends PU {
 
-export class CPU extends PU {
-
-    static createMemory () {
-        const memory = new WebAssembly.Memory({initial: 100, maximum: 100, shared: true});
-        const atomic = new Uint32Array(memory.buffer);
-        const malloc = Atomics.add.bind(Atomics, atomic, 1);
-
-        malloc(16);
-
-        Reflect.defineProperty(memory, "malloc", {
-            value: function (byteLength = 0) {
-                if (byteLength % 16) {
-                    byteLength += 16 - byteLength % 16;
-                }
-                return malloc(byteLength);
-            }
-        });
-
-        Reflect.defineProperty(memory, "isDefaultMemory", { value: true });
-        Reflect.defineProperty(PU, "memory", { value: memory, configurable: true })
-
-        return memory;
-    }
-
-    static wasm = Uint8Array.from(
-        "0061736d0100000001110260067f7f7f7f7f7f0060047f7f7f7f0002140103656e76066d656d6f72790203808004808004030c0b0000000000000101010101040401700064077a0c076633325f6164640000076633325f7375620001076633325f6d756c0002076633325f6469760003076633325f6d696e0004076633325f6d61780005076633325f6162730006076633325f6e65670007086633325f737172740008086633325f6365696c0009096633325f666c6f6f72000a0466756e630100090a010041000b04000102030a8f180bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde401fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0092380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde401fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70292380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde501fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0093380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde501fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70293380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde601fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0094380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde601fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70294380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde701fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0095380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde701fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70295380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde801fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0096380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde801fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70296380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde901fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0097380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde901fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70297380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde001fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028b380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde101fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028c380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde301fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b70291380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd67fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028d380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd68fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028e380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000b"
-        .match(/(..)/g).map(v => parseInt(v, 16))
-    ).buffer;
-
-    static workerURL = URL.createObjectURL(
-        new Blob([`(`, () => {
-                self.onmessage = e => {
-                    const { memory, module, buffer } = e.data;
-                    const atomic = new Int32Array(buffer);
-                    const args = atomic.subarray(2);
-                    const f = atomic.at.bind(atomic, 1);
-                    const pid = Number(name)
-                    WebAssembly
-                        .instantiate(module, {env: {memory}})
-                            .then(({exports: {func}}) => {
-                                postMessage(pid);
-                                let cycle = 0;
-                                while (++cycle) {
-                                    Atomics.store(atomic, 0, 0);
-                                    Atomics.wait(atomic, 0);
-                                    func.get(atomic[1]).apply(null, args);
-                                    postMessage(null);
-                                }
-                            })
-                    .catch((err) => postMessage(err))
-                }
-            }, `)`, `()`
-        ])
-    );
-
-    imports     = new WeakMap();
-    workers     = new Map();
-
-    createHandlers () {
+    createHandlers              () {
         const refTable = this.instance.exports.func;
 
         for (const name in this.instance.exports) {
@@ -628,51 +599,12 @@ export class CPU extends PU {
         }
     }
 
-    async createWorkerThreads () {
-        return Promise.all(new Array(PU.hardwareConcurrency).fill().map(() => {
-            return new Promise((resolve, reject) => {
-                const pid    = this.workers.size + 1;
-                const worker = new Worker(CPU.workerURL, {name: pid});
-                const buffer = new SharedArrayBuffer(8*4);
-                const atomic = new Int32Array(buffer);
-                
-                worker.postMessage({
-                    module: this.module,
-                    memory: this.memory, 
-                    buffer: buffer
-                });
-    
-                Object.defineProperty(worker, "pid", { value: pid })
-                Object.defineProperty(worker, "settask", { value: Int32Array.prototype.set.bind(atomic) })
-                Object.defineProperty(worker, "unlock", { value: Atomics.notify.bind(Atomics, atomic, 0, 1, 1) })
-        
-                worker.addEventListener(
-                    "message", e => {
-                        if (e.data != pid) {
-                            return reject(pid)
-                        } else resolve(pid)
-                    }, {once: true}
-                );
-    
-                this.workers.set(pid, worker);
-            })
-        }))
-    }
-
-    async createWindowThread () {
+    async init                  () {
         return new Promise(async (resolve, reject) => {
-            const imports = {env: {memory: this.memory}};
-            return WebAssembly.instantiate(this.module, imports)
-                .then(instance => this.instance = instance)
-                .then(() => resolve())
-            .catch(e => reject(`WASM instance creation failed: ${e}`));
-        });
-    } 
-
-
-    async create () {
-        return new Promise(async (resolve, reject) => {
-            if (this.module) { return resolve(); }
+            Object.defineProperties(this, {
+                imports : { value: new Map() },
+                workers : { value: new Map() },
+            });
 
             if (this.memory === undefined) {
                 this.memory = PU.memory ?? CPU.createMemory();
@@ -684,15 +616,15 @@ export class CPU extends PU {
                         .then(module => this.module = module)
                         .then(() => this.createWindowThread())
                         .then(() => this.createWorkerThreads())
-                        .then(() => resolve())
+                        .then(() => super.init(...arguments))
+                        .then(() => resolve(this))
                     .catch((err) => reject(`WebAssembly not instantiated: ${err}`))
-                .finally(() => super.create(...arguments))
             }   
             catch (e) { reject(`WebAssembly not supported: ${e}`)}
         });
     }
 
-    async destroy () {
+    async destroy               () {
         return new Promise(async (resolve, reject) => {
             try {
                 if (this.memory?.isDefaultMemory) {
@@ -708,54 +640,20 @@ export class CPU extends PU {
                 
                 Promise
                     .resolve(super.destroy(...arguments))
-                    .then(() => resolve())
+                    .then(() => resolve(this))
                 .catch(reject);
             }
             catch (e) { reject(`CPU destroy failed: ${e}`) }
         });
     }
 
-    import (view) {
-        if (view.buffer === this.memory.buffer) {
-            return view;
-        }
-
-        if (this.imports.has(view)) {
-            return this.imports.get(view);
-        }
-
-        const byteLength = view.byteLength;
-        const byteOffset = this.memory.malloc(byteLength);
-        const bufferView = Reflect.construct(
-            view.constructor, Array.of(
-                this.memory.buffer, byteOffset, view.length
-            )
-        );
-
-        bufferView.set(view);
-        this.imports.set(view, bufferView);
-
-        return bufferView;
-    }
-
-    export (view) {
-        if (this.imports.has(view)) {
-            const dst = this.imports.get(view);
-            if (dst !== view) {
-                dst.set(view);
-            }
-            return dst;
-        }
-        return view;
-    }
-
-    async calc ( options, source, values, target = source ) {
+    async calc                  (options, source, values, target = source) {
         super.lock( arguments );
 
         return new Promise(async (resolve, reject) => {
             const src = this.import(source);
             const val = this.import(values);
-            const dst = this.import(target);
+            const dst = this.import(target, false);
 
             const { byteOffset: srcByteOffset, length: srcLength } = src;
             const { byteOffset: valByteOffset, length: valLength } = val;
@@ -790,7 +688,7 @@ export class CPU extends PU {
     
                     worker.unlock();
                     promises.push(promise);
-                })
+                });
 
                 if (alignByteLength) {
                     promises.push( super[ options.funcName ](
@@ -803,17 +701,336 @@ export class CPU extends PU {
 
             return Promise
                 .all(promises)
-                    .then(() => this.export(dst))
+                    .then(() => this.export(dst, arguments[3]))
                     .then(out => resolve(out))
                 .catch(err => reject(err))
             .finally(() => this.release(arguments));
         });
     }
-} 
 
-export class GPU extends PU {
+    async createWorkerThreads   () {
+        return Promise.all(new Array(PU.hardwareConcurrency).fill().map(() => {
+            return new Promise((resolve, reject) => {
+                const pid    = this.workers.size + 1;
+                const worker = new Worker(CPU.workerURL, {name: pid});
+                const buffer = new SharedArrayBuffer(8*4);
+                const atomic = new Int32Array(buffer);
+                
+                worker.postMessage({
+                    module: this.module,
+                    memory: this.memory, 
+                    buffer: buffer
+                });
+    
+                Object.defineProperty(worker, "pid", { value: pid })
+                Object.defineProperty(worker, "settask", { value: Int32Array.prototype.set.bind(atomic) })
+                Object.defineProperty(worker, "unlock", { value: Atomics.notify.bind(Atomics, atomic, 0, 1, 1) })
+        
+                worker.addEventListener(
+                    "message", e => {
+                        if (e.data != pid) {
+                            return reject(pid)
+                        } else resolve(pid)
+                    }, {once: true}
+                );
+    
+                this.workers.set(pid, worker);
+            })
+        }))
+    }
 
-    static shader = String(`
+    async createWindowThread    () {
+        return new Promise(async (resolve, reject) => {
+            const imports = {env: {memory: this.memory}};
+            return WebAssembly.instantiate(this.module, imports)
+                .then(instance => this.instance = instance)
+                .then(() => resolve())
+            .catch(e => reject(`WASM instance creation failed: ${e}`));
+        });
+    } 
+
+    import                      (source, clone = true) {
+        if (source.buffer === this.memory.buffer) {
+            return source;
+        }
+        else {
+            if (this.imports.has(source)) {
+                return this.imports.get(source);
+            }
+            else {
+                try {
+                    const TypedArray = source.constructor;
+                    const length     = source.length;
+                    const byteLength = source.byteLength;
+                    const byteOffset = this.memory.malloc(byteLength);
+                    const target     = Reflect.construct(
+                        TypedArray, [ this.memory.buffer, byteOffset, length ]
+                    );
+                    
+                    this.imports.set( source, target );
+                    if (clone) { target.set(source); };
+            
+                    return target;
+                }
+                catch (e) { throw e; }
+            }
+        }
+    }
+
+    export                      (view, argview) {
+        if (this.imports.has(view)) {
+            const dst = this.imports.get(view);
+
+            if (dst !== view) {
+                dst.set(view);
+            }
+            
+            return dst;
+        }
+        
+        if (argview) {
+            argview.set(view);
+            return argview;
+        }
+
+        return view;
+    }
+
+    grow (byteLength) {
+        if (this.memory.buffer.byteLength < byteLength) {
+            const deltaByteLenth = Math.abs(this.memory.buffer.byteLength - byteLength);
+            const deltaPageSize  = Math.max(Math.ceil(deltaByteLenth / 65536), 0);
+            this.memory.grow( deltaPageSize );
+        }
+    }
+
+    static createMemory         () {
+        const initial = 1;
+        const maximum = 65536/2;
+
+        const memory = new WebAssembly.Memory({initial, maximum, shared: true});
+        const atomic = new Uint32Array(memory.buffer);
+        const malloc = Atomics.add.bind(Atomics, atomic, 1);
+
+        malloc(16);
+
+        let freePages = maximum - initial;
+        Reflect.defineProperty(memory, "malloc", {
+            value: function (byteLength = 0) {
+                
+                if (byteLength % 16) {
+                    byteLength = byteLength + 16 - byteLength % 16;
+                }
+                
+                let byteOffset = malloc(byteLength);
+                const byteDiff = byteOffset + byteLength - this.buffer.byteLength;
+
+                if (byteDiff > 0) {
+                    const size = Math.max(1, Math.ceil(byteDiff / 65536));
+                    freePages -= size;
+
+                    if (freePages < 0) { 
+                        throw `Memory size will be exceed: ${freePages}` 
+                    }
+                    
+                    try { this.grow(size); }
+                    catch (e) { throw `Memory size exceed: ${e}` }
+                    finally { `Memory resized with ${byteDiff} bytes` }
+                }
+
+                return byteOffset;
+            }
+        });
+
+        Reflect.defineProperty(memory, "initial", { value: initial });
+        Reflect.defineProperty(memory, "maximum", { value: maximum });
+        Reflect.defineProperty(memory, "isDefaultMemory", { value: true });
+        Reflect.defineProperty(PU, "memory", { value: memory, configurable: true })
+
+        return memory;
+    }
+
+    static wasm                 = Uint8Array.from(
+        "0061736d0100000001110260067f7f7f7f7f7f0060047f7f7f7f0002140103656e76066d656d6f72790203808004808004030c0b0000000000000101010101040401700064077a0c076633325f6164640000076633325f7375620001076633325f6d756c0002076633325f6469760003076633325f6d696e0004076633325f6d61780005076633325f6162730006076633325f6e65670007086633325f737172740008086633325f6365696c0009096633325f666c6f6f72000a0466756e630100090a010041000b04000102030a8f180bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde401fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0092380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde401fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70292380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde501fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0093380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde501fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70293380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde601fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0094380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde601fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70294380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde701fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0095380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde701fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70295380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde801fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0096380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde801fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70296380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bee0201027b20072004fd1c002000fd1c012002fd1c022005fd1c032107410120034604402007fd1b02fd090298d588b702210603402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022006fde901fd0b0498d588b7022007fd0c100000001000000000000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022006fd1f0097380298d588b7022007fd0c040000000400000000000000fffffffffdae0121070c010b0b0f0b2003200546044003402007fd1b0341044f04402007fd1b002007fd1b01fd000498d588b7022007fd1b02fd000498d588b702fde901fd0b0498d588b7022007fd0c100000001000000010000000fcfffffffdae0121070c010b0b03402007fd1b0341014f04402007fd1b002007fd1b012a0298d588b7022007fd1b022a0298d588b70297380298d588b7022007fd0c040000000400000004000000fffffffffdae0121070c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde001fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028b380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde101fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028c380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bae0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fde301fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b70291380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd67fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028d380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000bad0101017b20042002fd1c002000fd1c012001fd1c022003fd1c0321042001200346044003402004fd1b0341044f04402004fd1b002004fd1b01fd000498d588b702fd68fd0b0498d588b7022004fd0c1000000010000000fcfffffffcfffffffdae0121040c010b0b03402004fd1b0341014f04402004fd1b002004fd1b012a0298d588b7028e380298d588b7022004fd0c0400000004000000fffffffffffffffffdae0121040c010b0b0f0b000b"
+        .match(/(..)/g).map(v => parseInt(v, 16))
+    ).buffer;
+
+    static workerCode           = () => {
+        self.onmessage = e => {
+            const { memory, module, buffer } = e.data;
+            const queue     = new Int32Array(buffer);
+            const params    = queue.subarray(2);
+            const pid       = Number(name);
+
+            const reset     = Atomics.store.bind(Atomics, queue, 0, 0);
+            const lock      = Atomics.wait.bind(Atomics, queue, 0);
+
+            WebAssembly
+                .instantiate(module, {env: {memory}})
+                    .then(instance => {
+                        postMessage(pid);
+
+                        const handler = WebAssembly.Table.prototype.get.bind(
+                            instance.exports.func
+                        );
+
+                        do {
+                            lock();
+                            handler(queue[1]).apply(null, params);
+                            postMessage(0);
+                            reset();
+                        }
+                        while(true);
+
+                    })
+            .catch((err) => postMessage(err))
+        }
+    };
+
+    static workerURL            = URL.createObjectURL(
+        new Blob([`(${this.workerCode})()`])
+    );
+}; 
+
+export class WPU                extends EventTarget {
+    static script  = () => {
+        onmessage = e => WebAssembly.instantiate(e.data).then(i => {
+            const {memory: {buffer}} = e = i.exports;
+        });
+    }
+
+    init () {
+        WebAssembly.compileStreaming(fetch("wpu.wasm")).then(module =>
+            new Worker(URL.createObjectURL(
+                new Blob([`(${WPU.script})()`])
+            )).postMessage(module)
+        )
+    }
+}
+
+export class GPU                extends PU {
+
+    createHandlers              () {
+        this.handlers.f32_add   = this.calc.bind( this, {funcName: "f32_add"} );
+        this.handlers.f32_mul   = this.calc.bind( this, {funcName: "f32_mul"} );
+        this.handlers.f32_sub   = this.calc.bind( this, {funcName: "f32_sub"} );
+        this.handlers.f32_div   = this.calc.bind( this, {funcName: "f32_div"} );
+        this.handlers.f32_max   = this.calc.bind( this, {funcName: "f32_max"} );
+        this.handlers.f32_min   = this.calc.bind( this, {funcName: "f32_min"} );
+        this.handlers.f32_neg   = this.calc.bind( this, {funcName: "f32_neg"} );
+        this.handlers.f32_abs   = this.calc.bind( this, {funcName: "f32_abs"} );
+        this.handlers.f32_sqrt  = this.calc.bind( this, {funcName: "f32_sqrt"} );
+        this.handlers.f32_ceil  = this.calc.bind( this, {funcName: "f32_ceil"} );
+        this.handlers.f32_floor = this.calc.bind( this, {funcName: "f32_floor"} );
+        this.handlers.f32_vadd  = this.calc.bind( this, {funcName: "f32_vadd"} );
+        this.handlers.f32_vmul  = this.calc.bind( this, {funcName: "f32_vmul"} );
+        this.handlers.f32_vsub  = this.calc.bind( this, {funcName: "f32_vsub"} );
+        this.handlers.f32_vdiv  = this.calc.bind( this, {funcName: "f32_vdiv"} );
+        this.handlers.f32_vmax  = this.calc.bind( this, {funcName: "f32_vmax"} );
+        this.handlers.f32_vmin  = this.calc.bind( this, {funcName: "f32_vmin"} );
+    }
+
+    async init                  () {
+        return new Promise(async (resolve, reject) => {
+            this.acquireDevice()
+                    .then(() => this.createBuffers())
+                    .then(() => this.createPipelines())
+                    .then(() => resolve())
+                .catch((err) => reject(`GPU failed: ${err}`))
+            .finally(() => super.init(...arguments));
+        });
+    }
+
+    async destroy               () {
+        return new Promise(async (resolve, reject) => {
+            this.indexBuffer.destroy();
+            this.valueBuffer.destroy();
+            this.inputBuffer.destroy();
+            this.outputBuffer.destroy();
+            this.stagingBuffer.destroy();
+            this.device.destroy();
+            this.pipelines.clear();
+            this.vpipelines.clear();
+
+            Reflect.deleteProperty(this, "indexBuffer");
+            Reflect.deleteProperty(this, "valueBuffer");
+            Reflect.deleteProperty(this, "inputBuffer");
+            Reflect.deleteProperty(this, "outputBuffer");
+            Reflect.deleteProperty(this, "stagingBuffer");
+
+            Reflect.deleteProperty(this, "vpipelines");
+            Reflect.deleteProperty(this, "pipelines");
+            Reflect.deleteProperty(this, "bindingSize");
+            Reflect.deleteProperty(this, "workgroupSize");
+            Reflect.deleteProperty(this, "invocations");
+            
+            Reflect.deleteProperty(this, "bindGroup");
+            Reflect.deleteProperty(this, "bindLayout");
+            
+            Reflect.deleteProperty(this, "device");
+            Reflect.deleteProperty(this, "adapter");
+
+            super
+                .destroy(...arguments)
+                .then(resolve)
+                .catch(reject);
+        });
+    }
+
+    async calc                  (options, source, values, target = source) {
+        return new Promise((resolve, reject) => {
+            
+            const byteLength        = target.byteLength;
+            const commandEncoder    = this.device.createCommandEncoder();
+            const passEncoder       = commandEncoder.beginComputePass();
+    
+            this.device.queue.writeBuffer(this.indexBuffer, 0, Uint32Array.of(target.length));
+            this.device.queue.writeBuffer(this.valueBuffer, 0, values);
+            this.device.queue.writeBuffer(this.inputBuffer, 0, source);
+            
+            if (values.length === 1) {
+                passEncoder.setPipeline( this.vpipelines.get(options.funcName) );
+            }
+            else if (source.length === target.length) {
+                passEncoder.setPipeline( this.pipelines.get(options.funcName) );
+            }
+            else {
+                return reject(`Error: Source length (${source.length}) must be 1 or equal to target length (${target.length}).`)
+            }
+    
+            passEncoder.setBindGroup(0, this.bindGroup);
+            passEncoder.dispatchWorkgroups( this.workgroupSize, this.invocations );
+            passEncoder.end();
+        
+            commandEncoder.copyBufferToBuffer(
+                this.outputBuffer, 0, 
+                this.stagingBuffer, 0, byteLength
+            );
+            
+            this.device.queue.submit([commandEncoder.finish()]);
+    
+            const output = new Uint8Array(
+                target.buffer, target.byteOffset, byteLength
+            );
+            
+            this.stagingBuffer
+                .mapAsync(GPUMapMode.READ, 0, byteLength)
+                    .then(() => this.stagingBuffer.getMappedRange(0, byteLength))
+                    .then(buffer => output.set( new Uint8Array( buffer ) ))
+                    .then(() => this.release(arguments))
+                    .then(() => resolve(target))
+                .catch(error => reject(error))
+            ;
+        });
+    }
+
+    release                     () {
+        if (this.stagingBuffer.mapState === "mapped") {
+            this.stagingBuffer.unmap();
+        }
+    }
+
+    static shader               = String(`
         const wsize : u32 = 256;
         struct Inputs {
             // workgroup_id is a uniform built-in value.
@@ -918,10 +1135,7 @@ export class GPU extends PU {
         }
     `);
 
-    pipelines = new Map();
-    vpipelines = new Map();
-
-    async acquireDevice () { 
+    async acquireDevice         () { 
         return navigator.gpu
             .requestAdapter({ powerPreference: "high-performance" })
                 .then(adapter => this.adapter = adapter)
@@ -930,7 +1144,7 @@ export class GPU extends PU {
         ;
     }
     
-    createBuffers () {
+    createBuffers               () {
         this.bindingSize    = this.device.limits.maxStorageBufferBindingSize;
         this.workgroupSize  = this.device.limits.maxComputeWorkgroupsPerDimension;
         this.invocations    = this.device.limits.maxComputeInvocationsPerWorkgroup;
@@ -942,7 +1156,9 @@ export class GPU extends PU {
         this.stagingBuffer  = this.device.createBuffer({ size : this.bindingSize, usage : GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     }
 
-    createPipelines () {
+    createPipelines             () {
+        this.pipelines = new Map();
+        this.vpipelines = new Map();
 
         this.bindLayout    = this.device.createBindGroupLayout({
             label: "gpubg",
@@ -978,6 +1194,7 @@ export class GPU extends PU {
         this.pipelines.set("f32_sqrt" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_sqrt"  }, label: "f32_sqrt"}));
         this.pipelines.set("f32_ceil" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_ceil"  }, label: "f32_ceil"}));
         this.pipelines.set("f32_floor", this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_floor" }, label: "f32_floor"}));
+        
         this.vpipelines.set("f32_add" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vadd"  }, label: "f32_vadd"}));
         this.vpipelines.set("f32_mul" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vmul"  }, label: "f32_vmul"}));
         this.vpipelines.set("f32_sub" , this.device.createComputePipeline({ layout, compute : { module, entryPoint : "f32_vsub"  }, label: "f32_vsub"}));
@@ -998,118 +1215,11 @@ export class GPU extends PU {
         this.pipelines.set("f32_vmax",  this.vpipelines.get("f32_max"));
         this.pipelines.set("f32_vmin",  this.vpipelines.get("f32_min"));
     }
-
-    createHandlers () {
-        this.handlers.f32_add   = this.calc.bind( this, {funcName: "f32_add"} );
-        this.handlers.f32_mul   = this.calc.bind( this, {funcName: "f32_mul"} );
-        this.handlers.f32_sub   = this.calc.bind( this, {funcName: "f32_sub"} );
-        this.handlers.f32_div   = this.calc.bind( this, {funcName: "f32_div"} );
-        this.handlers.f32_max   = this.calc.bind( this, {funcName: "f32_max"} );
-        this.handlers.f32_min   = this.calc.bind( this, {funcName: "f32_min"} );
-        this.handlers.f32_neg   = this.calc.bind( this, {funcName: "f32_neg"} );
-        this.handlers.f32_abs   = this.calc.bind( this, {funcName: "f32_abs"} );
-        this.handlers.f32_sqrt  = this.calc.bind( this, {funcName: "f32_sqrt"} );
-        this.handlers.f32_ceil  = this.calc.bind( this, {funcName: "f32_ceil"} );
-        this.handlers.f32_floor = this.calc.bind( this, {funcName: "f32_floor"} );
-        this.handlers.f32_vadd  = this.calc.bind( this, {funcName: "f32_vadd"} );
-        this.handlers.f32_vmul  = this.calc.bind( this, {funcName: "f32_vmul"} );
-        this.handlers.f32_vsub  = this.calc.bind( this, {funcName: "f32_vsub"} );
-        this.handlers.f32_vdiv  = this.calc.bind( this, {funcName: "f32_vdiv"} );
-        this.handlers.f32_vmax  = this.calc.bind( this, {funcName: "f32_vmax"} );
-        this.handlers.f32_vmin  = this.calc.bind( this, {funcName: "f32_vmin"} );
-    }
-
-    async create () {
-        return new Promise(async (resolve, reject) => {
-            this.acquireDevice()
-                    .then(() => this.createBuffers())
-                    .then(() => this.createPipelines())
-                    .then(() => resolve())
-                .catch((err) => reject(`GPU failed: ${err}`))
-            .finally(() => super.create(...arguments));
-        });
-    }
-
-    async destroy () {
-        super.destroy(...arguments)
-    }
-
-    async calc ( options, source, values, target = source ) {
-        super.lock( arguments );
-
-        return new Promise((resolve, reject) => {
-            
-            const byteLength        = target.byteLength;
-            const commandEncoder    = this.device.createCommandEncoder();
-            const passEncoder       = commandEncoder.beginComputePass();
-    
-            this.device.queue.writeBuffer(this.indexBuffer, 0, Uint32Array.of(target.length));
-            this.device.queue.writeBuffer(this.valueBuffer, 0, values);
-            this.device.queue.writeBuffer(this.inputBuffer, 0, source);
-            
-            if (values.length === 1) {
-                passEncoder.setPipeline( this.vpipelines.get(options.funcName) );
-            }
-            else if (source.length === target.length) {
-                passEncoder.setPipeline( this.pipelines.get(options.funcName) );
-            }
-            else {
-                return reject(`Error: Source length (${source.length}) must be 1 or equal to target length (${target.length}).`)
-            }
-    
-            passEncoder.setBindGroup(0, this.bindGroup);
-            passEncoder.dispatchWorkgroups( this.workgroupSize, this.invocations );
-            passEncoder.end();
-        
-            commandEncoder.copyBufferToBuffer(
-                this.outputBuffer, 0, 
-                this.stagingBuffer, 0, byteLength
-            );
-            
-            this.device.queue.submit([commandEncoder.finish()]);
-    
-            const output = new Uint8Array(
-                target.buffer, target.byteOffset, byteLength
-            );
-            
-            this.stagingBuffer
-                .mapAsync(GPUMapMode.READ, 0, byteLength)
-                    .then(() => this.stagingBuffer.getMappedRange(0, byteLength))
-                    .then(buffer => output.set( new Uint8Array( buffer ) ))
-                    .then(() => resolve(target))
-                .catch(error => reject(error))
-            .finally(() => this.release(arguments));
-        });
-    }
-
-    release () {
-        if (this.stagingBuffer.mapState === "mapped") {
-            this.stagingBuffer.unmap();
-        }
-        
-        super.release(arguments);
-    }
 };
 
-export class NPU extends PU {
+export class NPU                extends PU {
 
-    async create () {
-        return this.context ?? navigator.ml
-            .createContext({ powerPreference: "default"})
-            .then(context => this.context = context)
-        .finally(() => super.create(...arguments))
-    }
-
-    async destroy () {
-        try {
-            this.context?.destroy();
-            Reflect.deleteProperty(this, "context");
-        }
-        catch (e) {}
-        finally { super.release(arguments); }
-    }
-
-    createHandlers () {
+    createHandlers              () {
         this.handlers.f32_add   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.add, dataType: "float32" } );
         this.handlers.f32_mul   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.mul, dataType: "float32" } );
         this.handlers.f32_sub   = this.calc.bind(this, { builder: MLGraphBuilder.prototype.sub, dataType: "float32" } );
@@ -1129,7 +1239,23 @@ export class NPU extends PU {
         this.handlers.f32_vmin  = this.handlers.f32_min;
     }
 
-    async calc ( options, source, values, target = source ) {
+    async init                  () {
+        return this.context ?? navigator.ml
+            .createContext({ powerPreference: "default"})
+            .then(context => this.context = context)
+        .finally(() => super.init(...arguments))
+    }
+
+    async destroy               () {
+        try {
+            this.context?.destroy();
+            Reflect.deleteProperty(this, "context");
+        }
+        catch (e) {}
+        finally { super.release(arguments); }
+    }
+
+    async calc                  (options, source, values, target = source) {
         super.lock( arguments );
         
         return new Promise(async (resolve, reject) => {
@@ -1160,7 +1286,16 @@ export class NPU extends PU {
         });
     }
 
-    dispatch ( tensors, source, values ) {
+    release                     () {
+        try {
+            this.graph?.destroy();
+            Reflect.deleteProperty(this, "graph");
+        }
+        catch (e) {}
+        finally { super.release(arguments); }
+    }    
+
+    dispatch                    (tensors, source, values) {
         const [ dst, src, val ] = tensors;
 
         this.context.writeTensor(src, source);
@@ -1169,138 +1304,675 @@ export class NPU extends PU {
 
         return dst;
     }
+};
 
-    release () {
-        try {
-            this.graph?.destroy();
-            Reflect.deleteProperty(this, "graph");
-        }
-        catch (e) {}
-        finally { super.release(arguments); }
-    }    
-}
+export class CPU_Native_SingleThread    extends EventEmitter {
 
-export default class IPU extends EventTarget {
-    static cpuSupport   = Boolean(Math.sqrt(4));
-    static wasmSupport  = Reflect.has(self, "WebAssembly");
-    static gpuSupport   = Reflect.has(navigator, "gpu");
-    static nnSupport    = Reflect.has(navigator, "ml");
+    f32_add         (source, values, target) {
+        return this.calc({ op: "f32_add" }, source, values, target);
+    }
 
-    integrate () {
-        const ipu = this;
+    f32_mul         (source, values, target) {
+        return this.calc({ op: "f32_mul" }, source, values, target);
+    }
 
-        Object.defineProperties( Object.getPrototypeOf(Uint8Array).prototype, {
-            add     : { value : function ( value, target = this ) { return ipu.calc( "f32_add", target, this, value ); } },
-            mul     : { value : function ( value, target = this ) { return ipu.calc( "f32_mul", target, this, value ); } },
-            div     : { value : function ( value, target = this ) { return ipu.calc( "f32_div", target, this, value ); } },
-            sub     : { value : function ( value, target = this ) { return ipu.calc( "f32_sub", target, this, value ); } },
-            max     : { value : function ( value, target = this ) { return ipu.calc( "f32_max", target, this, value ); } },
-            min     : { value : function ( value, target = this ) { return ipu.calc( "f32_min", target, this, value ); } },
-            neg     : { value : function ( target = this )        { return ipu.calc( "f32_neg",   target, this ); } },
-            abs     : { value : function ( target = this )        { return ipu.calc( "f32_abs",   target, this ); } },
-            sqrt    : { value : function ( target = this )        { return ipu.calc( "f32_sqrt",  target, this ); } },
-            ceil    : { value : function ( target = this )        { return ipu.calc( "f32_ceil",  target, this ); } },
-            floor   : { value : function ( target = this )        { return ipu.calc( "f32_floor", target, this ); } },
+    f32_sub         (source, values, target) {
+        return this.calc({ op: "f32_sub" }, source, values, target);
+    }
+
+    f32_div         (source, values, target) {
+        return this.calc({ op: "f32_div" }, source, values, target);
+    }
+
+    f32_rem         (source, values, target) {
+        return this.calc({ op: "f32_rem" }, source, values, target);
+    }
+
+    f32_max         (source, values, target) {
+        return this.calc({ op: "f32_max" }, source, values, target);
+    }
+
+    f32_min         (source, values, target) {
+        return this.calc({ op: "f32_min" }, source, values, target);
+    }
+
+    f32_sqrt        (source, target) {
+        return this.calc({ op: "f32_sqrt" }, source, null, target);
+    }
+
+    f32_ceil        (source, target) {
+        return this.calc({ op: "f32_ceil" }, source, null, target);
+    }
+
+    f32_floor       (source, target) {
+        return this.calc({ op: "f32_floor" }, source, null, target);
+    }
+
+    calc            (config, source, values, target) {
+        return new Promise((done, fail) => {
+            const opType  = config.op.split("_").at(1);
+            const vLength = values.length;
+            
+            let i = source.length; 
+
+            if (true === (target ??= source)) {
+                target = Reflect.construct(
+                    source.constructor, [i]
+                );
+            }
+            
+            switch (vLength) {
+                case 0:
+                case NaN:
+                case null:
+                case false:
+                case undefined:
+                    switch (opType) {
+                        case  "sqrt": while (i--) {target[i] = Math.sqrt(source[i])}  break;
+                        case  "ceil": while (i--) {target[i] = Math.ceil(source[i])}  break;
+                        case "floor": while (i--) {target[i] = Math.floor(source[i])} break;
+                        default: fail(new Error(`Math operation not supported: ${opType}`)); return;
+                    }
+                    done(target);
+                return;
+
+                case 1:
+                    const value = values[0];
+                    switch (opType) {
+                        case   "add": while (i--) {target[i] = source[i] + value} break;
+                        case   "mul": while (i--) {target[i] = source[i] * value} break;
+                        case   "sub": while (i--) {target[i] = source[i] - value} break;
+                        case   "div": while (i--) {target[i] = source[i] / value} break;
+                        case   "rem": while (i--) {target[i] = source[i] % value} break;
+                        case   "max": while (i--) {target[i] = Math.max(source[i], value)} break;
+                        case   "min": while (i--) {target[i] = Math.min(source[i], value)} break;
+                        default: fail(new Error(`Operation not supported: ${opType}`)); return;
+                    }
+                    done(target);
+                return;
+                
+                case source.length:
+                    switch (opType) {
+                        case   "add": while (i--) {target[i] = source[i] + values[i]} break;
+                        case   "mul": while (i--) {target[i] = source[i] * values[i]} break;
+                        case   "sub": while (i--) {target[i] = source[i] - values[i]} break;
+                        case   "div": while (i--) {target[i] = source[i] / values[i]} break;
+                        case   "rem": while (i--) {target[i] = source[i] % values[i]} break;
+                        case   "max": while (i--) {target[i] = Math.max(source[i], values[i])} break;
+                        case   "min": while (i--) {target[i] = Math.min(source[i], values[i])} break;
+                        default: fail(new Error(`Operation not supported: ${opType}`)); return;
+                    }
+                    done(target);
+                return;
+                
+                default:
+                    fail(new Error(`Lengths are not calculatable ${source.length}, ${vLength}`));
+                return;
+            }
         });
     }
 
-    constructor ( puType ) {
-        super();
+    close           () {
+        this.clear()
+        this.emit("closed")
+    }
 
-        switch ( +puType ) {
-            case +new.target.GPU : this.pu = new GPU(); break;
-            case +new.target.NPU : this.pu = new NPU(); break;
-            case +new.target.CPU : this.pu = new CPU(); break;
-                         default : this.pu = new  PU(); break;
+    clear           () {
+        this.emit("clear")
+    }
+
+    init            () {
+        this.emit("ready") 
+    }
+
+}
+
+export class CPU_Native_MultiThread_DetachBuffer     extends EventEmitter {
+    constructor () {
+        super(...arguments)
+
+        this.buffer = new ArrayBuffer(0o0 <<- 0x0, { maxByteLength: 16E+7 });
+        this.view = {
+            Float32Array : new Float32Array(this.buffer),
+            Uint32Array : new Uint32Array(this.buffer),
+            Uint8Array : new Uint8Array(this.buffer),
         };
     }
 
-    static setMemory ( memory ) {
-        this.memory = memory ;
-    }
+    grow (byteLength) { this.buffer.resize( byteLength ) }
 
-    typedArray ( op = "f32_any", ...args ) {
+    static get workerURL () {
 
-        const tagName = {
-            f32 : "Float32Array",
-            u32 : "Uint32Array",
-        }[ op.split(/_/).at(0) ];
+        const onReadyCall = () => {
 
-        if (Reflect.has(this.memory, tagName)) {
-            return this.memory[ tagName ]( ...args );
-        }
+            const e0 = new Error(`Worker is NOT idle!`);
+            let idle = 1;
 
-        return Reflect.construct( 
-            self[ tagName ], args 
-        );
-    }
+            addEventListener("message", async e => {
+                const {config, source, values, target} = e.data;
 
-    error () {
-        throw new Error(...arguments)
-    }
+                if (!idle) return postMessage(e0)
+                else idle = 0;
+            
+                self.pu
+                    .calc(config, source, values, target)
+                        .then(t => postMessage(t, [t.buffer]))
+                    .catch(e => postMessage(e))
+                .finally(() => idle = 1);
+            });
+            
+            postMessage(performance.now());
+        };
 
-    async calc () {
-        let [
-            op,
-            target,
-            source,
-            value,
-        ] = arguments;
+        const scopeScript = [
+            `\n${Object.getPrototypeOf(this.SinglePU)};`,
+            `\nself.pu = new ${this.SinglePU};`,
+            `\nself.pu.on("ready", ${onReadyCall});`,
+            `\nself.pu.init();`,
+        ];
 
-        const handler = Reflect.get( this.pu, op );
-        if ( !handler ) throw `Undefined operation: ${op}`;
-
-        if (typeof value === "number") {
-            value = this.typedArray(op, 1).fill(value);
-        }
-        else
-        if (value === undefined) {
-            value = {};
-        }
-
-        if (target === true) {
-            target = this.typedArray(op, source.length);
-        }
-        else
-        if (target === undefined) {
-            target = source;
-        }
-        
-        const { byteOffset: dstByteOffset, length: dstLength } = target;
-        const { byteOffset: srcByteOffset, length: srcLength } = source;
-        const { byteOffset: valByteOffset, length: valLength } = value;
-
-        if (dstLength * srcLength === 0) {
-            this.error(this.ERROR_SOURCE_TARGET_VALUE_ALL_NEEDS_LENGTH, arguments);
-            return;
-        }
-
-        if (srcLength - dstLength) {
-            this.error(this.ERROR_SOURCE_AND_TARGET_MUST_HAS_EQUAL_LENGTH, arguments);
-            return;
-        }
-
-        if (valLength > srcLength) {
-            this.error(this.ERROR_VALUE_LENGTH_EXCEES_SOURCE_LENGTH, arguments);
-            return;
-        }
-        
-        await Reflect.apply(
-            handler, this.pu, Array.of(
-                dstByteOffset, dstLength,
-                srcByteOffset, srcLength,
-                valByteOffset, valLength,            
+        Object.defineProperty(this, "workerURL", {
+            value: URL.createObjectURL(
+                new Blob( scopeScript )
             )
-        );
+        });
 
-        return target;
+        return this.workerURL;
+    }
+
+    static SinglePU     = CPU_Native_SingleThread;
+
+    workers             = [];
+
+    concurrency         = navigator.hardwareConcurrency;
+
+    f32_add             (source, values, target) {
+        return this.calc({ op: "f32_add" }, source, values, target);
+    }
+
+    f32_mul             (source, values, target) {
+        return this.calc({ op: "f32_mul" }, source, values, target);
+    }
+
+    f32_sub             (source, values, target) {
+        return this.calc({ op: "f32_sub" }, source, values, target);
+    }
+
+    f32_div             (source, values, target) {
+        return this.calc({ op: "f32_div" }, source, values, target);
+    }
+
+    f32_rem             (source, values, target) {
+        return this.calc({ op: "f32_rem" }, source, values, target);
+    }
+
+    f32_max             (source, values, target) {
+        return this.calc({ op: "f32_max" }, source, values, target);
+    }
+
+    f32_min             (source, values, target) {
+        return this.calc({ op: "f32_min" }, source, values, target);
+    }
+
+    f32_sqrt            (source, target) {
+        return this.calc({ op: "f32_sqrt" }, source, null, target);
+    }
+
+    f32_ceil            (source, target) {
+        return this.calc({ op: "f32_ceil" }, source, null, target);
+    }
+
+    f32_floor           (source, target) {
+        return this.calc({ op: "f32_floor" }, source, null, target);
+    }
+
+    clear               () {
+        this.workers.map(w => w.terminate())
+        this.workers.length = 0;
+
+        if (typeof this.spu?.close === "function") {
+            this.spu.close();
+        }
+
+        this.emit("clear")
+    }
+
+    close               () {
+        this.clear();
+        this.emit("closed")
+    }
+
+    fail                () {
+        const [ error ] = arguments;
+        this.emit("error", error);
+        this.close(-1);
+    }
+
+    fork                () {
+        return new Promise((resolve, reject) => {
+            const worker = new Worker(this.constructor.workerURL, {name: "cpu"});
+            worker.addEventListener("message", e => resolve(worker), {once: true});
+            worker.addEventListener("error", e => reject(e), {once: true});
+        });
+    }
+
+    init                (concurrency = this.concurrency) {
+        return new Promise((done, fail) => {
+            this.clear();
+            
+            this.spu = Reflect.construct(this.constructor.SinglePU, this);
+            this.spu.on("ready", async () => {
+                
+                const promises = [];
+                
+                while (concurrency--)
+                    promises.push(this.fork());
+    
+                promises.map(p => 
+                    p.then(worker => this.workers.push(worker))
+                    .catch(worker => worker.terminate())
+                );
+    
+                Promise.all(promises).finally(() => {
+                    if (this.workers.length > 0) { 
+                        this.workers.map((w,i) => w.i = i);
+                        this.emit("ready"); 
+                        done(this); 
+                    } 
+                    else { 
+                        this.fail(new Error(`No workers created.`));
+                        fail(null); 
+                    }
+                });
+            });
+            
+            this.spu.init();
+        });
+    }
+
+    calc                (config, source, values, target) {
+        return new Promise((done, fail) => {
+
+            const idleWorkers   = this.workers.filter(w => !w.busy);
+            
+            const workerCount   = idleWorkers.length;
+            const calcCount     = source.length;
+
+            const alignLength   = (calcCount % workerCount);
+            const threadLength  = (calcCount - alignLength) / workerCount;
+
+            if (true === (target ??= source)) {
+                target = Reflect.construct(
+                    source.constructor, [ calcCount ]
+                );
+            }
+    
+            const promises  = idleWorkers.map((worker, i) => {
+                worker.busy = true;
+    
+                const begin = alignLength + (threadLength * i);
+                const end   = begin + threadLength;    
+                const data  = Object({config, source: source.subarray(begin, end).slice()});
+
+                const transfers = Array.of(data.source.buffer);
+
+                if (values) {
+                    if (values.length === 1) { data.values = values.slice(); }
+                    else { data.values = values.subarray(begin,end).slice(); }
+                    transfers.push( data.values.buffer );
+                }
+        
+                if (target !== source) {
+                    data.target = target.subarray(begin, end).slice();
+                    transfers.push( data.target.buffer );
+                };
+                    
+                const promise = new Promise((resolve, reject) => {
+                    worker.addEventListener("error", e => reject(e), {once: true});
+                    worker.addEventListener("message", e => {
+                        e.target.busy = false;
+                        
+                        if (e.data instanceof Error) {
+                            reject(e.data);
+                            return;
+                        } 
+                        
+                        target.subarray(begin, end).set(e.data);
+                        resolve();
+                        return;
+                    }, {once: true});
+                });
+
+                worker.postMessage(data, transfers);
+
+                return promise;
+            });
+    
+            if (alignLength > 0) {
+                promises.push(
+                    this.spu.calc(
+                        config, 
+                        source.subarray(0, alignLength), 
+                        values.subarray(0, alignLength), 
+                        target.subarray(0, alignLength)
+                    )
+                );
+            };
+            
+            Promise.all(promises)
+                .then(() => done(target))
+            .catch(error => fail(error));
+        });
     }
 }
 
-const proto = Reflect.get( IPU, "prototype" );
+export class CPU_Native_MultiThread_SharedBuffer     extends EventEmitter {
 
-CONST.forEach(e => {
-    const prop = e.toString();
-    Object.defineProperty(IPU, prop, {value: e} );
-    Object.defineProperty(proto, prop, {value: e} );
+    constructor () {
+        if ("SharedArrayBuffer" in self === false) {
+            throw(new Error(`SharedArrayBuffer is not supported!`));
+        }
+        
+        super(...arguments)
+
+        this.buffer = new SharedArrayBuffer(0o0 <<- 0x0, { maxByteLength: 16E+7 });
+        this.view = {
+            Float32Array : new Float32Array(this.buffer),
+            Uint32Array : new Uint32Array(this.buffer),
+            Uint8Array : new Uint8Array(this.buffer),
+        };
+    }
+
+    grow (byteLength) { this.buffer.grow( byteLength ) }
+
+    static get workerURL () {
+
+        const onReadyCall = () => {
+            addEventListener("message", e => {
+
+                let isIdle = 1;
+                const err0 = new Error(`Worker is NOT idle!`);
+                const view = {
+                    Float32Array : new Float32Array(e.data),
+                    Uint32Array : new Uint32Array(e.data),
+                };
+    
+                addEventListener("message", async e => {
+                    const {config, begin, end} = e.data;
+    
+                    if (!isIdle) return postMessage(err0)
+                    else isIdle = 0;
+                
+                    const source = view[ config.TypedArray ].subarray( begin.source, end.source );
+                    const values = view[ config.TypedArray ].subarray( begin.values, end.values );
+                    const target = view[ config.TypedArray ].subarray( begin.target, end.target );
+
+                    self.pu
+                        .calc(config, source, values, target)
+                            .then(() => postMessage(1))
+                        .catch(e => postMessage(e))
+                    .finally(() => isIdle = 1);
+                });
+                
+                postMessage(performance.now());
+            }, {once: true})
+        };
+
+        const scopeScript = [
+            `\n${Object.getPrototypeOf(this.SinglePU)};`,
+            `\nself.pu = new ${this.SinglePU};`,
+            `\nself.pu.on("ready", ${onReadyCall});`,
+            `\nself.pu.init();`,
+        ];
+
+        Object.defineProperty(this, "workerURL", {
+            value: URL.createObjectURL(
+                new Blob( scopeScript )
+            )
+        });
+
+        return this.workerURL;
+    }
+
+    static SinglePU     = CPU_Native_SingleThread;
+
+    workers             = [];
+
+    concurrency         = navigator.hardwareConcurrency;
+
+    f32_add             (source, values, target) {
+        return this.calc({ op: "f32_add", wasmType: "f32", npuType: "float32", gpuType: "float", TypedArray: "Float32Array" }, source, values, target);
+    }
+
+    clear               () {
+        this.emit("clear")
+    }
+
+    close               () {
+        this.clear();
+        this.emit("closed")
+    }
+
+    fail                () {
+        const [ error ] = arguments;
+        this.emit("error", error);
+        this.close(-1);
+    }
+
+    fork                () {
+        return new Promise((resolve, reject) => {
+            const worker = new Worker(this.constructor.workerURL, {name: "cpu"});
+            worker.addEventListener("message", e => resolve(worker), {once: true});
+            worker.addEventListener("error", e => reject(e), {once: true});
+            worker.postMessage(this.buffer);
+        });
+    }
+
+    init (concurrency = this.concurrency) {
+        return new Promise((done, fail) => {
+
+            this.clear();
+            
+            
+            this.spu = Reflect.construct(this.constructor.SinglePU, this);
+            this.spu.on("ready", async () => {
+                
+                const promises = [];
+                
+                while (concurrency--)
+                    promises.push(this.fork());
+    
+                promises.map(p => 
+                    p.then(worker => this.workers.push(worker))
+                    .catch(worker => worker.terminate())
+                );
+    
+                Promise.all(promises).finally(() => {
+                    if (this.workers.length > 0) { 
+                        this.workers.map((w,i) => w.i = i);
+                        this.emit("ready"); 
+                        done(this); 
+                    } 
+                    else { 
+                        this.fail(new Error(`No workers created.`));
+                        fail(null); 
+                    }
+                });
+            });
+            
+            this.spu.init();
+        });
+    }
+
+    bind                (worker) {
+        return new Promise((resolve, reject) => {
+            worker.addEventListener("error", e => reject(e), {once: true});
+            worker.addEventListener("message", e => {
+                e.target.busy = false;
+                
+                if (e.data instanceof Error) {
+                    reject(e.data);
+                    return;
+                } 
+                
+                resolve();
+            }, {once: true});
+        });
+    }
+
+    calc                (config, source, values, target) {
+        return new Promise((done, fail) => {
+
+            const idleWorkers   = this.workers.filter(w => !w.busy);
+            
+            const workerCount   = idleWorkers.length;
+            const calcCount     = source.length;
+
+            const alignLength   = (calcCount % workerCount);
+            const threadLength  = (calcCount - alignLength) / workerCount;
+
+            let offset          = 0;
+
+            let srcView     , valView   , dstView, 
+                srcLength   , valLength , dstLength,
+                srcBegin    , valBegin  , dstBegin,
+                srcEnd      , valEnd    , dstEnd;
+
+            if (true === (target ??= source)) {
+                target = Reflect.construct(
+                    source.constructor, [
+                        calcCount
+                    ]
+                );
+            }
+
+            srcLength = source.length; 
+            valLength = values.length; 
+            dstLength = target.length; 
+
+            const requiredByteLength = (
+                source.byteLength + 
+                values.byteLength + 
+                target.byteLength
+            ); 
+
+            if (requiredByteLength > this.buffer.byteLength) {
+                this.buffer.grow( requiredByteLength );
+            }
+
+            if (source.buffer !== this.buffer) {
+                srcBegin  = offset;   
+                srcEnd    = srcBegin + srcLength;   
+                srcView   = this.view[ config.TypedArray ].subarray( srcBegin, srcEnd );
+                offset   += srcView.length;
+                
+                srcView.set( source );
+            }
+            else {
+                srcBegin  = source.byteOffset / source.BYTES_PER_ELEMENT;
+                srcEnd    = srcBegin + srcLength;
+                srcView   = source;
+            }
+
+            if (values.buffer !== this.buffer) {
+                valBegin  = offset;   
+                valEnd    = valBegin + valLength;
+                valView   = this.view[ config.TypedArray ].subarray( valBegin, valEnd );
+                offset   += valView.length;
+
+                valView.set( values );
+            }
+            else {
+                valBegin  = values.byteOffset / values.BYTES_PER_ELEMENT;
+                valEnd    = valBegin + valLength;
+                valView   = values;
+            }
+            
+            if (target.buffer !== this.buffer) {
+                dstBegin  = offset;
+                dstEnd    = dstBegin + dstLength;
+                dstView   = this.view[ config.TypedArray ].subarray( dstBegin, dstEnd );
+                offset   += dstView.length;
+            }
+            else {
+                dstBegin  = target.byteOffset / target.BYTES_PER_ELEMENT;
+                dstEnd    = dstBegin + dstLength;
+                dstView   = target;
+            }
+
+            const promises  = idleWorkers.map((worker, i) => {
+                worker.busy = true;
+
+                const data  = { 
+                    config  : config, 
+                    begin   : { 
+                        source : srcBegin, 
+                        values : valBegin, 
+                        target : dstBegin, 
+                    },
+                    end     : {}
+                };
+
+                const threadOffset = alignLength + (threadLength * i);
+                data.begin.source += threadOffset;
+                data.begin.target += threadOffset;
+                
+                if (valLength === srcLength) {
+                    data.begin.values += threadOffset;
+                }
+                
+                data.end.source = data.begin.source + srcLength;
+                data.end.values = data.begin.values + valLength;
+                data.end.target = data.begin.target + dstLength;
+
+                worker.postMessage(data);
+                
+                return this.bind(worker);
+            });
+    
+            if (alignLength > 0) {
+                promises.push(
+                    this.spu.calc(
+                        config, 
+                        srcView.subarray(0, alignLength), 
+                        valView.subarray(0, alignLength), 
+                        dstView.subarray(0, alignLength)
+                    )
+                );
+            };
+            
+            Promise.all(promises)
+                .then(() => {
+                    if (target.buffer !== dstView.buffer) {
+                        target.set(dstView);
+                        return;
+                    }
+                    if (target.byteOffset !== dstView.byteOffset) {
+                        this.view.Uint8Array.copyWithin(
+                            target.byteOffset, 
+                            dstView.byteOffset,
+                            dstView.byteOffset + dstView.byteLength
+                        )
+                    }
+                })
+                .then(() => done(target))
+            .catch(error => fail(error));
+        });
+    }
+}
+
+export default {
+    CPU, GPU, NPU,
+    CPU_Native_SingleThread,
+    CPU_Native_MultiThread_DetachBuffer,
+    CPU_Native_MultiThread_SharedBuffer
+}
+
+Object.defineProperties(PU.prototype, {
+    IDLE    : { value: enumerate("IDLE") },
+    BUSY    : { value: enumerate("BUSY") },
+    READY   : { value: enumerate("READY") },
+    LOCKED  : { value: enumerate("LOCKED") },
+    CLOSED  : { value: enumerate("CLOSED") },
+    INIT    : { value: enumerate("INIT") },
 });

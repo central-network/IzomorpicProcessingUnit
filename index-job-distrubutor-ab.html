@@ -1,0 +1,19 @@
+<meta charset="utf8" />
+
+<script type="module">
+    let dagitici = new WebTransport("https://cen.net:4433/?AB");
+    await dagitici.ready;
+
+    console.warn("dagitici:", dagitici);
+
+    let istemciA = new WebTransport("https://cen.net:4433/?AB:A");
+    await istemciA.ready;
+
+    console.warn("istemci a:", istemciA);
+
+    let istemciB = new WebTransport("https://cen.net:4433/?AB:B");
+    await istemciB.ready;
+
+    console.warn("istemci b:", istemciB);
+    
+</script>

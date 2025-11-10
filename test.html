@@ -1,0 +1,42 @@
+<meta charset="utf8" />
+
+<script type="module">
+    let dagitici = new WebTransport("https://cen.net:4433/?AB");
+    await dagitici.ready;
+    console.warn("dagitici:", dagitici);
+
+    const bds = dagitici.incomingBidirectionalStreams;
+    const reader = bds.getReader();
+
+    (async () => {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            console.warn("dagitici stream geldi:", value);
+            
+            const dataReader = value.readable.getReader();
+            const { value: data } = await dataReader.read();
+            console.warn("dagitici veri:", data);
+            
+            const writer = value.writable.getWriter();
+            await writer.write(new Uint8Array([data[0] + 1]));
+            console.warn("dagitici geri gönderdi");
+        }
+    })();
+
+    setTimeout(async () => {
+        let istemciA = new WebTransport("https://cen.net:4433/?AB:A");
+        await istemciA.ready;
+        console.warn("istemci a:", istemciA);
+        
+        const stream = await istemciA.createBidirectionalStream();
+        const writer = stream.writable.getWriter();
+        await writer.write(new Uint8Array([42]));
+        console.warn("istemci A gönderdi");
+        
+        const reader = stream.readable.getReader();
+        const { value } = await reader.read();
+        console.warn("istemci A aldı:", value);
+    }, 500);
+
+</script>
