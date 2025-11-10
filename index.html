@@ -1,7 +1,7 @@
 <meta charset="utf8" />
 <script type="module">
     import PU from "./index.js"
-    const _pu = new PU.CPU_Native_SingleThread();
+    const _pu = new PU.CPU();
     // const _pu = new PU.CPU();
     // const _pu = new PU.GPU();
     // const _pu = new PU.NPU();
@@ -9,7 +9,7 @@
     // const _pu = new PU.CPU_Native_MultiThread_DetachBuffer();
     // const _pu = new PU.CPU_Native_MultiThread_SharedBuffer();
 
-    const len = 13554432;
+    const len = 4000000;
     const tlen = 2 * len + 1;
     const blen = tlen * Float32Array.BYTES_PER_ELEMENT;
     

@@ -701,8 +701,8 @@ export class CPU                extends PU {
 
             return Promise
                 .all(promises)
-                    .then(() => this.export(dst, arguments[3]))
-                    .then(out => resolve(out))
+                    .then(() => this.export(dst, target))
+                    .then(() => resolve(target))
                 .catch(err => reject(err))
             .finally(() => this.release(arguments));
         });
@@ -777,23 +777,12 @@ export class CPU                extends PU {
         }
     }
 
-    export                      (view, argview) {
-        if (this.imports.has(view)) {
-            const dst = this.imports.get(view);
-
-            if (dst !== view) {
-                dst.set(view);
-            }
-            
-            return dst;
-        }
-        
-        if (argview) {
-            argview.set(view);
-            return argview;
+    export                      (dst, target) {
+        if (target !== dst) {
+            target.set(dst);
         }
 
-        return view;
+        this.imports.clear();
     }
 
     grow (byteLength) {
@@ -1309,50 +1298,137 @@ export class NPU                extends PU {
 export class CPU_Native_SingleThread    extends EventEmitter {
 
     f32_add         (source, values, target) {
-        return this.calc({ op: "f32_add" }, source, values, target);
+        return this.calc({ op: "f32_add", mathType : "add" }, source, values, target);
     }
 
     f32_mul         (source, values, target) {
-        return this.calc({ op: "f32_mul" }, source, values, target);
+        return this.calc({ op: "f32_mul", mathType: "mul" }, source, values, target);
     }
 
     f32_sub         (source, values, target) {
-        return this.calc({ op: "f32_sub" }, source, values, target);
+        return this.calc({ op: "f32_sub", mathType: "sub" }, source, values, target);
     }
 
     f32_div         (source, values, target) {
-        return this.calc({ op: "f32_div" }, source, values, target);
+        return this.calc({ op: "f32_div", mathType: "div" }, source, values, target);
     }
 
     f32_rem         (source, values, target) {
-        return this.calc({ op: "f32_rem" }, source, values, target);
+        return this.calc({ op: "f32_rem", mathType: "rem" }, source, values, target);
     }
 
     f32_max         (source, values, target) {
-        return this.calc({ op: "f32_max" }, source, values, target);
+        return this.calc({ op: "f32_max", mathType: "max" }, source, values, target);
     }
 
     f32_min         (source, values, target) {
-        return this.calc({ op: "f32_min" }, source, values, target);
+        return this.calc({ op: "f32_min", mathType: "min" }, source, values, target);
     }
 
     f32_sqrt        (source, target) {
-        return this.calc({ op: "f32_sqrt" }, source, null, target);
+        return this.calc({ op: "f32_sqrt", mathType: "sqrt" }, source, null, target);
     }
 
     f32_ceil        (source, target) {
-        return this.calc({ op: "f32_ceil" }, source, null, target);
+        return this.calc({ op: "f32_ceil", mathType: "ceil" }, source, null, target);
     }
 
     f32_floor       (source, target) {
-        return this.calc({ op: "f32_floor" }, source, null, target);
+        return this.calc({ op: "f32_floor", mathType: "floor" }, source, null, target);
+    }
+
+    evaluate        (value, TypedArray, length = 0) {
+        // instanceof TypedArray
+        if (ArrayBuffer.isView(value)) {
+            return value;
+        } 
+
+        // undefined
+        if (typeof value !== "undefined") {
+            // instanceof Array
+            if (Array.isArray(value)) {
+                length = value.length;
+                const byteLength = length * TypedArray.BYTES_PER_ELEMENT;
+                const byteOffset = this.malloc?.(byteLength);
+                const bufferView = new TypedArray(this.buffer ?? length, byteOffset, length);
+                bufferView.set(value);
+                
+                return bufferView;
+
+            }
+
+            // instanceof {PrimitiveValue}
+            if (Object(value) !== value) {
+                length = 1;
+                const byteLength = length * TypedArray.BYTES_PER_ELEMENT;
+                const byteOffset = this.malloc?.(byteLength);
+                const bufferView = new TypedArray(this.buffer ?? length, byteOffset, length);
+                bufferView[0] = value;
+                
+                return bufferView;
+            }
+
+            // instanceof [SharedArray|Array]Buffer
+            if ((false === "buffer"      in value) && 
+                (true  === "byteLength"  in value) && 
+                (false === "byteOffset"  in value)) {
+                return new TypedArray(value); 
+            }
+
+            // instanceof DataView
+            if ((true === "buffer"      in value) && 
+                (true === "byteLength"  in value) && 
+                (true === "byteOffset"  in value)) {
+                return new TypedArray(
+                    value.buffer, 
+                    value.byteOffset, 
+                    value.byteLength / TypedArray.BYTES_PER_ELEMENT
+                ); 
+            }
+
+            // wasm memory
+            if ((true  === "buffer"      in value) && 
+                (false === "byteLength"  in value) && 
+                (false === "byteOffset"  in value)) {
+                return this.evaluate(value.buffer); 
+            }
+        }
+
+        const byteLength = length * TypedArray.BYTES_PER_ELEMENT;
+        const byteOffset = this.malloc?.(byteLength);
+
+        return new TypedArray(
+            this.buffer ?? length, 
+            byteOffset, 
+            length
+        );
+    }
+
+    importSource (source, TypedArray) {
+        const view = this.evaluate(source, TypedArray);
+        if (view.length > 0) { return view; }
+        throw `Given argument could NOT recognized as a source: ${source}`;
+    }
+
+    importTarget (target, source, TypedArray) {
+        if (target === true) {
+            return this.importSource(source, TypedArray); 
+        }
+
+        const length    = source.length;
+        const view      = this.evaluate(target, TypedArray, length);
+
+        if (view.length === length) { return view; }
+        throw `Given argument could NOT recognized as a target: ${target}`;
+    }
+
+    importValues (values, TypedArray) {
+        return this.evaluate(values, TypedArray);
     }
 
     calc            (config, source, values, target) {
         return new Promise((done, fail) => {
-            const opType  = config.op.split("_").at(1);
-            const vLength = values.length;
-            
+
             let i = source.length; 
 
             if (true === (target ??= source)) {
@@ -1361,24 +1437,24 @@ export class CPU_Native_SingleThread    extends EventEmitter {
                 );
             }
             
-            switch (vLength) {
+            switch (values.length) {
                 case 0:
                 case NaN:
                 case null:
                 case false:
                 case undefined:
-                    switch (opType) {
+                    switch (config.mathType) {
                         case  "sqrt": while (i--) {target[i] = Math.sqrt(source[i])}  break;
                         case  "ceil": while (i--) {target[i] = Math.ceil(source[i])}  break;
                         case "floor": while (i--) {target[i] = Math.floor(source[i])} break;
-                        default: fail(new Error(`Math operation not supported: ${opType}`)); return;
+                        default: fail(new Error(`Math operation not supported: ${config.mathType}`)); return;
                     }
                     done(target);
                 return;
 
                 case 1:
                     const value = values[0];
-                    switch (opType) {
+                    switch (config.mathType) {
                         case   "add": while (i--) {target[i] = source[i] + value} break;
                         case   "mul": while (i--) {target[i] = source[i] * value} break;
                         case   "sub": while (i--) {target[i] = source[i] - value} break;
@@ -1386,13 +1462,13 @@ export class CPU_Native_SingleThread    extends EventEmitter {
                         case   "rem": while (i--) {target[i] = source[i] % value} break;
                         case   "max": while (i--) {target[i] = Math.max(source[i], value)} break;
                         case   "min": while (i--) {target[i] = Math.min(source[i], value)} break;
-                        default: fail(new Error(`Operation not supported: ${opType}`)); return;
+                        default: fail(new Error(`Operation not supported: ${config.mathType}`)); return;
                     }
                     done(target);
                 return;
                 
                 case source.length:
-                    switch (opType) {
+                    switch (config.mathType) {
                         case   "add": while (i--) {target[i] = source[i] + values[i]} break;
                         case   "mul": while (i--) {target[i] = source[i] * values[i]} break;
                         case   "sub": while (i--) {target[i] = source[i] - values[i]} break;
@@ -1400,13 +1476,13 @@ export class CPU_Native_SingleThread    extends EventEmitter {
                         case   "rem": while (i--) {target[i] = source[i] % values[i]} break;
                         case   "max": while (i--) {target[i] = Math.max(source[i], values[i])} break;
                         case   "min": while (i--) {target[i] = Math.min(source[i], values[i])} break;
-                        default: fail(new Error(`Operation not supported: ${opType}`)); return;
+                        default: fail(new Error(`Operation not supported: ${config.mathType}`)); return;
                     }
                     done(target);
                 return;
                 
                 default:
-                    fail(new Error(`Lengths are not calculatable ${source.length}, ${vLength}`));
+                    fail(new Error(`Lengths are not calculatable ${source.length}, ${values.length}`));
                 return;
             }
         });
