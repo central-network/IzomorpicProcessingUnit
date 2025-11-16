@@ -651,14 +651,17 @@ export class CPU                extends PU {
         super.lock( arguments );
 
         return new Promise(async (resolve, reject) => {
-            const src = this.import(source);
-            const val = this.import(values);
-            const dst = this.import(target, false);
+            const srcByteOffset =                             0, srcByteLength = source.byteLength, srcLength = source.length;
+            const valByteOffset = srcByteOffset + srcByteLength, valByteLength = values.byteLength, valLength = values.length;
+            const dstByteOffset = valByteOffset + valByteLength, dstByteLength = target.byteLength, dstLength = target.length;
 
-            const { byteOffset: srcByteOffset, length: srcLength } = src;
-            const { byteOffset: valByteOffset, length: valLength } = val;
-            const { byteOffset: dstByteOffset, length: dstLength } = dst;
-    
+            const src = new source.constructor( this.memory.buffer, srcByteOffset, srcLength );
+            const val = new values.constructor( this.memory.buffer, valByteOffset, valLength );
+            const dst = new target.constructor( this.memory.buffer, dstByteOffset, dstLength );
+
+            src.set(source)
+            val.set(values)
+
             const promises          = new Array();
             const concurrency       = this.workers.size;
             const alignByteLength   = (dst.byteLength) % (16 * concurrency);
@@ -701,7 +704,7 @@ export class CPU                extends PU {
 
             return Promise
                 .all(promises)
-                    .then(() => this.export(dst, target))
+                    .then(() => target.set(dst))
                     .then(() => resolve(target))
                 .catch(err => reject(err))
             .finally(() => this.release(arguments));
@@ -762,9 +765,8 @@ export class CPU                extends PU {
                     const TypedArray = source.constructor;
                     const length     = source.length;
                     const byteLength = source.byteLength;
-                    const byteOffset = this.memory.malloc(byteLength);
                     const target     = Reflect.construct(
-                        TypedArray, [ this.memory.buffer, byteOffset, length ]
+                        TypedArray, [ this.memory.buffer, 0, length ]
                     );
                     
                     this.imports.set( source, target );
@@ -794,7 +796,7 @@ export class CPU                extends PU {
     }
 
     static createMemory         () {
-        const initial = 1;
+        const initial = 10000;
         const maximum = 65536/2;
 
         const memory = new WebAssembly.Memory({initial, maximum, shared: true});
@@ -988,7 +990,7 @@ export class GPU                extends PU {
             }
     
             passEncoder.setBindGroup(0, this.bindGroup);
-            passEncoder.dispatchWorkgroups( this.workgroupSize, this.invocations );
+            passEncoder.dispatchWorkgroups(Math.ceil(byteLength / 64), 1, 1);
             passEncoder.end();
         
             commandEncoder.copyBufferToBuffer(
@@ -2036,6 +2038,8 @@ export class CPU_Native_MultiThread_SharedBuffer     extends EventEmitter {
         });
     }
 }
+
+
 
 export default {
     CPU, GPU, NPU,
