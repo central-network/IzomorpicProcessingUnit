@@ -7,16 +7,412 @@
         const blob   = new Blob([`onmessage = e => { e.data[1].push(console); WebAssembly.instantiate(...e.data).then(close); }`]);
         const url    = URL.createObjectURL(blob);
 
-        const { memory, unlock, calc, exit, maxLength, resize, malloc, Float32Array } = m.instance.exports;
-        const data = [module, [{memory}]];
-
-        new Worker(url).postMessage(data);
-        new Worker(url).postMessage(data);
-        new Worker(url).postMessage(data);
-
-        self.e = m.instance.exports;
-
-        console.warn(m.instance.exports);
+        const e = m.instance.exports;
+        console.warn(e);
         
+        
+        // const data = [module, [{memory: e.memory}]];
+        // new Worker(url).postMessage(data);
+        // new Worker(url).postMessage(data);
+        // new Worker(url).postMessage(data);
+        
+
+
+        
+        class Pointer extends Number {
+
+            static memoryOffset     = 0;
+            static maxModelCount    = 1e1;
+            static maxVertexCount   = 1e2;	
+            static maxIndiceCount   = 1e3;
+
+            static getUint32        = e.getUint32;
+            static setUint32        = e.setUint32;
+            static getUint16        = e.getUint16;
+            static setUint16        = e.setUint16;
+            static getFloat32       = e.getFloat32;
+            static setFloat32       = e.setFloat32;
+            static TypedArray       = e.TypedArray;
+            
+            constructor (offset) {
+                super(offset || (Pointer.memoryOffset += 4));
+            }
+
+            static at (offset) {
+                return offset && new this(offset) || null;
+            }
+
+            static model_index                = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_index");
+            static model_scene                = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_scene");
+            static model_parent               = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_parent");
+            static model_vertices_offset      = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_vertices_offset");
+            static model_vertices_length      = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_vertices_length");
+            static model_indices_offset       = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_indices_offset");
+            static model_indices_length       = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_indices_length");
+            static model_local_position_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x");
+            static model_local_position_x_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x_cos");
+            static model_local_position_x_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x_sin");
+            static model_local_position_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z");
+            static model_local_position_z_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z_cos");
+            static model_local_position_z_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z_sin");
+            static model_local_position_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y");
+            static model_local_position_y_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y_cos");
+            static model_local_position_y_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y_sin");
+            static model_local_position_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w");
+            static model_local_position_w_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w_cos");
+            static model_local_position_w_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w_sin");
+            static model_local_rotation_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_x");
+            static model_local_rotation_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_y");
+            static model_local_rotation_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_z");
+            static model_local_rotation_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_w");
+            static model_local_scale_x        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_x");
+            static model_local_scale_y        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_y");
+            static model_local_scale_z        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_z");
+            static model_local_scale_w        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_w");
+            static model_local_color_r        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_r");
+            static model_local_color_g        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_g");
+            static model_local_color_b        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_b");
+            static model_local_color_a        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_a");
+            static model_world_color_r        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_r");
+            static model_world_color_g        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_g");
+            static model_world_color_b        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_b");
+            static model_world_color_a        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_a");
+            static model_world_position_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_x");
+            static model_world_position_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_y");
+            static model_world_position_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_z");
+            static model_world_position_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_w");
+            static model_world_rotation_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_x");
+            static model_world_rotation_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_y");
+            static model_world_rotation_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_z");
+            static model_world_rotation_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_w");
+            static model_world_scale_x        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_x");
+            static model_world_scale_y        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_y");
+            static model_world_scale_z        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_z");
+            static model_world_scale_w        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_w");
+            static vertex_source_position_x   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_x");
+            static vertex_source_position_y   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_y");
+            static vertex_source_position_z   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_z");
+            static vertex_source_position_w   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_w");
+            static vertex_source_fragment_r   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_r");
+            static vertex_source_fragment_g   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_g");
+            static vertex_source_fragment_b   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_b");
+            static vertex_source_fragment_a   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_a");
+            static vertex_render_position_x   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_x");
+            static vertex_render_position_y   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_y");
+            static vertex_render_position_z   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_z");
+            static vertex_render_position_w   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_w");
+            static vertex_render_fragment_r   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_r");
+            static vertex_render_fragment_g   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_g");
+            static vertex_render_fragment_b   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_b");
+            static vertex_render_fragment_a   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_a");
+            static model_vertex_indice        = this.TypedArray(this.maxIndiceCount, Uint16Array,  "model_vertex_indice");
+
+            get_model_index                  () { return Pointer.getUint32(  Pointer.model_index, this )  };
+            get_model_scene                  () { return Pointer.getUint32(  Pointer.model_scene, this )  };
+            get_model_parent                 () { return Pointer.getUint32(  Pointer.model_parent, this )  };
+            get_model_vertices_offset        () { return Pointer.getUint32(  Pointer.model_vertices_offset, this )  };
+            get_model_vertices_length        () { return Pointer.getUint32(  Pointer.model_vertices_length, this )  };
+            get_model_indices_offset         () { return Pointer.getUint32(  Pointer.model_indices_offset, this )  };
+            get_model_indices_length         () { return Pointer.getUint32(  Pointer.model_indices_length, this )  };
+            get_model_local_position_x       () { return Pointer.getFloat32( Pointer.model_local_position_x, this ) };
+            get_model_local_position_x_cos   () { return Pointer.getFloat32( Pointer.model_local_position_x_cos, this ) };
+            get_model_local_position_x_sin   () { return Pointer.getFloat32( Pointer.model_local_position_x_sin, this ) };
+            get_model_local_position_z       () { return Pointer.getFloat32( Pointer.model_local_position_z, this ) };
+            get_model_local_position_z_cos   () { return Pointer.getFloat32( Pointer.model_local_position_z_cos, this ) };
+            get_model_local_position_z_sin   () { return Pointer.getFloat32( Pointer.model_local_position_z_sin, this ) };
+            get_model_local_position_y       () { return Pointer.getFloat32( Pointer.model_local_position_y, this ) };
+            get_model_local_position_y_cos   () { return Pointer.getFloat32( Pointer.model_local_position_y_cos, this ) };
+            get_model_local_position_y_sin   () { return Pointer.getFloat32( Pointer.model_local_position_y_sin, this ) };
+            get_model_local_position_w       () { return Pointer.getFloat32( Pointer.model_local_position_w, this ) };
+            get_model_local_position_w_cos   () { return Pointer.getFloat32( Pointer.model_local_position_w_cos, this ) };
+            get_model_local_position_w_sin   () { return Pointer.getFloat32( Pointer.model_local_position_w_sin, this ) };
+            get_model_local_rotation_x       () { return Pointer.getFloat32( Pointer.model_local_rotation_x, this ) };
+            get_model_local_rotation_y       () { return Pointer.getFloat32( Pointer.model_local_rotation_y, this ) };
+            get_model_local_rotation_z       () { return Pointer.getFloat32( Pointer.model_local_rotation_z, this ) };
+            get_model_local_rotation_w       () { return Pointer.getFloat32( Pointer.model_local_rotation_w, this ) };
+            get_model_local_scale_x          () { return Pointer.getFloat32( Pointer.model_local_scale_x, this ) };
+            get_model_local_scale_y          () { return Pointer.getFloat32( Pointer.model_local_scale_y, this ) };
+            get_model_local_scale_z          () { return Pointer.getFloat32( Pointer.model_local_scale_z, this ) };
+            get_model_local_scale_w          () { return Pointer.getFloat32( Pointer.model_local_scale_w, this ) };
+            get_model_local_color_r          () { return Pointer.getFloat32( Pointer.model_local_color_r, this ) };
+            get_model_local_color_g          () { return Pointer.getFloat32( Pointer.model_local_color_g, this ) };
+            get_model_local_color_b          () { return Pointer.getFloat32( Pointer.model_local_color_b, this ) };
+            get_model_local_color_a          () { return Pointer.getFloat32( Pointer.model_local_color_a, this ) };
+            get_model_world_color_r          () { return Pointer.getFloat32( Pointer.model_world_color_r, this ) };
+            get_model_world_color_g          () { return Pointer.getFloat32( Pointer.model_world_color_g, this ) };
+            get_model_world_color_b          () { return Pointer.getFloat32( Pointer.model_world_color_b, this ) };
+            get_model_world_color_a          () { return Pointer.getFloat32( Pointer.model_world_color_a, this ) };
+            get_model_world_position_x       () { return Pointer.getFloat32( Pointer.model_world_position_x, this ) };
+            get_model_world_position_y       () { return Pointer.getFloat32( Pointer.model_world_position_y, this ) };
+            get_model_world_position_z       () { return Pointer.getFloat32( Pointer.model_world_position_z, this ) };
+            get_model_world_position_w       () { return Pointer.getFloat32( Pointer.model_world_position_w, this ) };
+            get_model_world_rotation_x       () { return Pointer.getFloat32( Pointer.model_world_rotation_x, this ) };
+            get_model_world_rotation_y       () { return Pointer.getFloat32( Pointer.model_world_rotation_y, this ) };
+            get_model_world_rotation_z       () { return Pointer.getFloat32( Pointer.model_world_rotation_z, this ) };
+            get_model_world_rotation_w       () { return Pointer.getFloat32( Pointer.model_world_rotation_w, this ) };
+            get_model_world_scale_x          () { return Pointer.getFloat32( Pointer.model_world_scale_x, this ) };
+            get_model_world_scale_y          () { return Pointer.getFloat32( Pointer.model_world_scale_y, this ) };
+            get_model_world_scale_z          () { return Pointer.getFloat32( Pointer.model_world_scale_z, this ) };
+            get_model_world_scale_w          () { return Pointer.getFloat32( Pointer.model_world_scale_w, this ) };
+            get_vertex_source_position_x     () { return Pointer.getFloat32( Pointer.vertex_source_position_x, this )};
+            get_vertex_source_position_y     () { return Pointer.getFloat32( Pointer.vertex_source_position_y, this )};
+            get_vertex_source_position_z     () { return Pointer.getFloat32( Pointer.vertex_source_position_z, this )};
+            get_vertex_source_position_w     () { return Pointer.getFloat32( Pointer.vertex_source_position_w, this )};
+            get_vertex_source_fragment_r     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_r, this )};
+            get_vertex_source_fragment_g     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_g, this )};
+            get_vertex_source_fragment_b     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_b, this )};
+            get_vertex_source_fragment_a     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_a, this )};
+            get_vertex_render_position_x     () { return Pointer.getFloat32( Pointer.vertex_render_position_x, this )};
+            get_vertex_render_position_y     () { return Pointer.getFloat32( Pointer.vertex_render_position_y, this )};
+            get_vertex_render_position_z     () { return Pointer.getFloat32( Pointer.vertex_render_position_z, this )};
+            get_vertex_render_position_w     () { return Pointer.getFloat32( Pointer.vertex_render_position_w, this )};
+            get_vertex_render_fragment_r     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_r, this )};
+            get_vertex_render_fragment_g     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_g, this )};
+            get_vertex_render_fragment_b     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_b, this )};
+            get_vertex_render_fragment_a     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_a, this )};
+            get_model_vertex_indice          () { return Pointer.getUint16(  Pointer.model_vertex_indice, this ) };
+            
+            set_model_index                  ( value ) { Pointer.setUint32(  Pointer.model_index, this, value )  };
+            set_model_scene                  ( value ) { Pointer.setUint32(  Pointer.model_scene, this, value )  };
+            set_model_parent                 ( value ) { Pointer.setUint32(  Pointer.model_parent, this, value )  };
+            set_model_vertices_offset        ( value ) { Pointer.setUint32(  Pointer.model_vertices_offset, this, value )  };
+            set_model_vertices_length        ( value ) { Pointer.setUint32(  Pointer.model_vertices_length, this, value )  };
+            set_model_indices_offset         ( value ) { Pointer.setUint32(  Pointer.model_indices_offset, this, value )  };
+            set_model_indices_length         ( value ) { Pointer.setUint32(  Pointer.model_indices_length, this, value )  };
+            set_model_local_position_x       ( value ) { Pointer.setFloat32( Pointer.model_local_position_x, this, value ) };
+            set_model_local_position_x_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_x_cos, this, value ) };
+            set_model_local_position_x_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_x_sin, this, value ) };
+            set_model_local_position_z       ( value ) { Pointer.setFloat32( Pointer.model_local_position_z, this, value ) };
+            set_model_local_position_z_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_z_cos, this, value ) };
+            set_model_local_position_z_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_z_sin, this, value ) };
+            set_model_local_position_y       ( value ) { Pointer.setFloat32( Pointer.model_local_position_y, this, value ) };
+            set_model_local_position_y_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_y_cos, this, value ) };
+            set_model_local_position_y_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_y_sin, this, value ) };
+            set_model_local_position_w       ( value ) { Pointer.setFloat32( Pointer.model_local_position_w, this, value ) };
+            set_model_local_position_w_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_w_cos, this, value ) };
+            set_model_local_position_w_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_w_sin, this, value ) };
+            set_model_local_rotation_x       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_x, this, value ) };
+            set_model_local_rotation_y       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_y, this, value ) };
+            set_model_local_rotation_z       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_z, this, value ) };
+            set_model_local_rotation_w       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_w, this, value ) };
+            set_model_local_scale_x          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_x, this, value ) };
+            set_model_local_scale_y          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_y, this, value ) };
+            set_model_local_scale_z          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_z, this, value ) };
+            set_model_local_scale_w          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_w, this, value ) };
+            set_model_local_color_r          ( value ) { Pointer.setFloat32( Pointer.model_local_color_r, this, value ) };
+            set_model_local_color_g          ( value ) { Pointer.setFloat32( Pointer.model_local_color_g, this, value ) };
+            set_model_local_color_b          ( value ) { Pointer.setFloat32( Pointer.model_local_color_b, this, value ) };
+            set_model_local_color_a          ( value ) { Pointer.setFloat32( Pointer.model_local_color_a, this, value ) };
+            set_model_world_color_r          ( value ) { Pointer.setFloat32( Pointer.model_world_color_r, this, value ) };
+            set_model_world_color_g          ( value ) { Pointer.setFloat32( Pointer.model_world_color_g, this, value ) };
+            set_model_world_color_b          ( value ) { Pointer.setFloat32( Pointer.model_world_color_b, this, value ) };
+            set_model_world_color_a          ( value ) { Pointer.setFloat32( Pointer.model_world_color_a, this, value ) };
+            set_model_world_position_x       ( value ) { Pointer.setFloat32( Pointer.model_world_position_x, this, value ) };
+            set_model_world_position_y       ( value ) { Pointer.setFloat32( Pointer.model_world_position_y, this, value ) };
+            set_model_world_position_z       ( value ) { Pointer.setFloat32( Pointer.model_world_position_z, this, value ) };
+            set_model_world_position_w       ( value ) { Pointer.setFloat32( Pointer.model_world_position_w, this, value ) };
+            set_model_world_rotation_x       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_x, this, value ) };
+            set_model_world_rotation_y       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_y, this, value ) };
+            set_model_world_rotation_z       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_z, this, value ) };
+            set_model_world_rotation_w       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_w, this, value ) };
+            set_model_world_scale_x          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_x, this, value ) };
+            set_model_world_scale_y          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_y, this, value ) };
+            set_model_world_scale_z          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_z, this, value ) };
+            set_model_world_scale_w          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_w, this, value ) };
+            set_vertex_source_position_x     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_x, this, value )};
+            set_vertex_source_position_y     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_y, this, value )};
+            set_vertex_source_position_z     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_z, this, value )};
+            set_vertex_source_position_w     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_w, this, value )};
+            set_vertex_source_fragment_r     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_r, this, value )};
+            set_vertex_source_fragment_g     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_g, this, value )};
+            set_vertex_source_fragment_b     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_b, this, value )};
+            set_vertex_source_fragment_a     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_a, this, value )};
+            set_vertex_render_position_x     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_x, this, value )};
+            set_vertex_render_position_y     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_y, this, value )};
+            set_vertex_render_position_z     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_z, this, value )};
+            set_vertex_render_position_w     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_w, this, value )};
+            set_vertex_render_fragment_r     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_r, this, value )};
+            set_vertex_render_fragment_g     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_g, this, value )};
+            set_vertex_render_fragment_b     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_b, this, value )};
+            set_vertex_render_fragment_a     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_a, this, value )};
+            set_model_vertex_indice          ( value ) { Pointer.setUint16(  Pointer.model_vertex_indice, this, value ) };
+                        
+            static Vector = class extends this {
+
+                static getter = this.getFloat32;
+                static setter = this.setFloat32;
+
+                static LocalPosition = class Position extends this {
+                    static base = {
+                        x: this.model_local_position_x,
+                        y: this.model_local_position_y,
+                        z: this.model_local_position_z,
+                        w: this.model_local_position_w,
+                    }
+                };
+
+                static WorldPosition = class extends this {
+                    static base = {
+                        x: this.model_world_position_x,
+                        y: this.model_world_position_y,
+                        z: this.model_world_position_z,
+                        w: this.model_world_position_w,
+                    }
+                };
+
+                static LocalRotation = class Rotation extends this {
+                    static base = {
+                        x: this.model_local_rotation_x,
+                        y: this.model_local_rotation_y,
+                        z: this.model_local_rotation_z,
+                        w: this.model_local_rotation_w,
+                    }
+                };
+
+                static WorldRotation = class extends this {
+                    static base = {
+                        x: this.model_world_rotation_x,
+                        y: this.model_world_rotation_y,
+                        z: this.model_world_rotation_z,
+                        w: this.model_world_rotation_w,
+                    }
+                };
+
+                static LocalScale = class Scale extends this {
+                    static base = {
+                        x: this.model_local_scale_x,
+                        y: this.model_local_scale_y,
+                        z: this.model_local_scale_z,
+                        w: this.model_local_scale_w,
+                    }
+                };
+
+                static WorldScale = class extends this {
+                    static base = {
+                        x: this.model_world_scale_x,
+                        y: this.model_world_scale_y,
+                        z: this.model_world_scale_z,
+                        w: this.model_world_scale_w,
+                    }
+                };
+
+                static LocalColor = class Color extends this {
+                    static base = {
+                        r: this.model_local_color_r,
+                        g: this.model_local_color_g,
+                        b: this.model_local_color_b,
+                        a: this.model_local_color_a,
+                    }
+                };
+
+                static WorldColor = class extends this {
+                    static base = {
+                        r: this.model_world_color_r,
+                        g: this.model_world_color_g,
+                        b: this.model_world_color_b,
+                        a: this.model_world_color_a,
+                    }
+                };
+
+                static createDescriptor = function (label, target) {
+                    const base      = this.base[ label ];
+
+                    const getter    = this.getter;
+                    const setter    = this.setter;
+
+                    return {
+                        get         : Reflect.apply.bind(Reflect, getter, null, [ base, target ]),
+                        set         : setter.bind(null, base, target ), 
+                        enumerable  : true,
+                    };
+                };
+
+                constructor (offset) {
+                    Object.defineProperties(super(offset), 
+                        Object.fromEntries(Object.keys(new.target.base).map(key =>
+                            Array.of(key, new.target.createDescriptor(key, this))
+                        ))
+                    );
+                };
+            };
+
+            static Object = class extends this {
+                static Scene  = class extends this {};
+                static Model  = class extends this {};
+                static Camera = class extends this {
+                    static Perspective = class extends this {};
+                    static Ortographic = class extends this {};
+                };
+            };
+        };
+
+        const { 
+            Vector : { 
+                LocalPosition, LocalRotation, LocalScale, LocalColor,
+                WorldPosition, WorldRotation, WorldScale, WorldColor, },
+            Object : { 
+                Scene, Model, Camera, 
+            Camera : { 
+                Perspective, Ortographic }}, 
+        } = Pointer;
+
+        Object.defineProperties( Pointer.Object.prototype, {
+            position : { enumerable : true, 
+                get : function () { return new LocalPosition( this ) }, 
+                set : function ( value ) { Object.assign(this.position, Object(value)) } 
+            },
+
+            rotation : { enumerable : true, 
+                get : function () { return new LocalRotation( this ) }, 
+                set : function ( value ) { Object.assign(this.rotation, Object(value)) } 
+            },
+        });
+
+
+        Object.defineProperties( Model.prototype, {
+            scale : { enumerable : true, 
+                get : function () { return new LocalScale( this ) }, 
+                set : function ( value ) { Object.assign(this.scale, Object(value)) } 
+            },
+                        
+            scene : { enumerable : true, 
+                get : function () { return Scene.at(this.get_model_scene()); }, 
+                set : function ( value ) { this.set_model_scene(value || 0); }, 
+            },
+
+            parent : { enumerable : true, 
+                get : function () { return Model.at(this.get_model_parent()); }, 
+                set : function ( value ) { this.set_model_parent(value || 0); }, 
+            },
+
+            color : { enumerable : true, 
+                get : function () { return new LocalColor( this ) }, 
+                set : function ( value ) { Object.assign(this.color, Object(value)) } 
+            },
+        });
+
+
+        Object.defineProperties( Scene.prototype, {
+            background : { enumerable : true, 
+                get : function () { return new LocalColor( this ) }, 
+                set : function ( value ) { Object.assign(this.color, Object(value)) } 
+            },
+        });
+
+
+        const scene = new Scene();
+
+        console.log(scene);
+
+        const m1 = new Model();
+        const m2 = new Model(8);
+        const m3 = new Model();
+
+        m2.parent = m3;
+        m3.scene = scene;
+
+        console.log(m1);
+        console.log(m2);
+        console.log(m3);        
     })
 </script>

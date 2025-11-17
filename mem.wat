@@ -10,6 +10,7 @@
     (import "Reflect" "set"                         (func $set<ref.ref.ref> (param externref externref externref)))
     (import "Reflect" "set"                         (func $set<ref.i32.i32> (param externref i32 i32)))
     (import "Reflect" "set"                         (func $set<ref.i32.ref> (param externref i32 externref)))
+    (import "Reflect" "apply"                       (func $apply<refx3> (param externref externref externref) (result)))
     (import "Reflect" "apply"                       (func $apply<refx3>ref (param externref externref externref) (result externref)))
     (import "Reflect" "construct"                   (func $construct<refx2>ref (param externref externref) (result externref)))
     (import "Reflect" "defineProperty"              (func $defineProperty<refx3> (param externref externref externref)))
@@ -23,6 +24,7 @@
     (import "self" "Object"                         (func $Object<ref>ref (param externref) (result externref)))
     (import "Array" "of"                            (func $Array.of<i32>ref (param i32) (result externref)))
     (import "Array" "of"                            (func $Array.of<ref>ref (param externref) (result externref)))
+    (import "Array" "of"                            (func $Array.of<fun>ref (param funcref) (result externref)))
     (import "Array" "of"                            (func $Array.of<refx2>ref (param externref externref) (result externref)))
     (import "Object" "is"                           (func $Object.is<refx2>i32 (param externref externref) (result i32)))
     (import "Object" "create"                       (func $Object.create<ref> (param externref) (result)))
@@ -30,6 +32,10 @@
     (import "Object" "fromEntries"                  (func $Object.fromEntries<ref>ref (param externref) (result externref)))
     (import "self" "Boolean"                        (func $Boolean<ref>i32 (param externref) (result i32)))
     (import "self" "Boolean"                        (func $Boolean<i32>ref (param i32) (result externref)))
+    (import "self" "Number"                         (func $Number<ref>i32 (param externref) (result i32)))
+    (import "self" "Number"                         (func $Number<ref>f32 (param externref) (result f32)))
+    (import "self" "Number"                         (func $Number<i32>ref (param i32) (result externref)))
+    (import "self" "Number"                         (func $Number<f32>ref (param f32) (result externref)))
 
     (import "self" "self"                           (global $self externref))
     (import "self" "name"                           (global $name externref))
@@ -39,6 +45,16 @@
     
     (import "Symbol" "toStringTag"                  (global $Symbol.toStringTag externref))
     (import "String" "fromCharCode"                 (global $String.fromCharCode externref))
+
+    (import "self" "Array"                          (global $Array externref))
+    (import "Array" "prototype"                     (global $Array.prototype externref))
+
+    (import "self" "Function"                       (global $Function externref))
+    (import "Function" "prototype"                  (global $Function.prototype externref))
+    (import "Function" "bind"                       (global $Function:bind externref))
+
+    (import "self" "Reflect"                        (global $Reflect externref))
+    (import "Reflect" "apply"                       (global $Reflect.apply externref))
 
     (import "self" "Uint8Array"                     (global $Uint8Array externref))
     (import "self" "Uint16Array"                    (global $Uint16Array externref))
@@ -63,10 +79,22 @@
     (global $true                                   (mut externref) (ref.null extern))
     (global $false                                  (mut externref) (ref.null extern))
     (global $null                                   externref (ref.null extern))
+    
+    (global $Array:push                             (mut externref) (ref.null extern))
 
+    (global $'get'          (mut externref) (ref.null extern))
+    (global $'set'          (mut externref) (ref.null extern))
     (global $'name'         (mut externref) (ref.null extern))
     (global $'value'        (mut externref) (ref.null extern))
+    (global $'type'         (mut externref) (ref.null extern))
+    (global $'byteOffset'   (mut externref) (ref.null extern))
+    (global $'byteLength'   (mut externref) (ref.null extern))
+    (global $'length'       (mut externref) (ref.null extern))
+    (global $'buffer'       (mut externref) (ref.null extern))
+    (global $'prototype'    (mut externref) (ref.null extern))
+    (global $'enumerable'   (mut externref) (ref.null extern))
     (global $'configurable' (mut externref) (ref.null extern))
+    (global $'push'         (mut externref) (ref.null extern))
     (global $'Pointer'      (mut externref) (ref.null extern))
     
     (global $#Pointer       (mut externref) (ref.null extern))
@@ -124,73 +152,257 @@
         (call $setGlobals)
     )
 
+    (func (export "Base")
+        (param $maxLength i32)
+        (result externref)
+
+        (local $byteOffset  externref)
+        (local $byteLength  externref)
+        (local $length      externref)
+        (local $type        externref)
+        (local $base        externref)
+
+        (local.set $byteOffset (call $new.Uint32Array<i32>ref (local.get $maxLength)))
+        (local.set $byteLength (call $new.Uint32Array<i32>ref (local.get $maxLength)))
+        (local.set $length     (call $new.Uint32Array<i32>ref (local.get $maxLength)))
+        (local.set $type       (call $new.Uint32Array<i32>ref (local.get $maxLength)))
+
+        (local.set $base       (call $Object.create<ref>ref (global.get $null)))
+        
+        (call $set<ref.ref.ref> (local.get $base) (global.get $'byteOffset') (local.get $byteOffset))
+        (call $set<ref.ref.ref> (local.get $base) (global.get $'byteLength') (local.get $byteLength))
+        (call $set<ref.ref.ref> (local.get $base) (global.get $'length') (local.get $length))
+        (call $set<ref.ref.ref> (local.get $base) (global.get $'type') (local.get $type))
+
+        (local.get $base)
+    )
+
     (func $setGlobals
-        (local $arguments<array> externref)
+        (local $arguments externref)
 
         (global.set $true  (call $Boolean<i32>ref (i32.const 1)))
         (global.set $false (call $Boolean<i32>ref (i32.const 0)))
 
-        (local.set $arguments<array> (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 0) (i32.const 118))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 1) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 2) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 3) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 4) (i32.const 101))
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 103))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
+        (global.set $'get' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 115))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
+        (global.set $'set' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 112))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
+        (global.set $'type' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 112))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 114))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 111))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 111))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 121))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 112))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 101))
+        (global.set $'prototype' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 112))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 117))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 115))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 104))
+        (global.set $Array:push 
+            (call $get<refx2>ref 
+                (global.get $Array.prototype)
+                (call $apply<refx3>ref 
+                    (global.get $String.fromCharCode) 
+                    (global.get $self) 
+                    (local.get $arguments)
+                )
+            )
+        )
+
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 117))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 109))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 114))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const  97))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const  98))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 108))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 101))
+        (global.set $'enumerable' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const 118))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const  97))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 108))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 117))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 4) (i32.const 101))
         (global.set $'value' 
             (call $apply<refx3>ref 
                 (global.get $String.fromCharCode) 
                 (global.get $self) 
-                (local.get $arguments<array>)
+                (local.get $arguments)
             )
         )
 
-        (local.set $arguments<array> (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  0) (i32.const  99))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  1) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  2) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  3) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  4) (i32.const 105))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  5) (i32.const 103))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  6) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  7) (i32.const 114))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  8) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const  9) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 10) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 11) (i32.const 101))
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  99))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 111))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 102))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 105))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 103))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 117))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 114))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const  97))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const  98))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 10) (i32.const 108))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 11) (i32.const 101))
         (global.set $'configurable' 
             (call $apply<refx3>ref 
                 (global.get $String.fromCharCode) 
                 (global.get $self) 
-                (local.get $arguments<array>)
+                (local.get $arguments)
             )
         )
 
-        (local.set $arguments<array> (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 0) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 1) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 2) (i32.const 109))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 3) (i32.const 101))
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const  97))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 109))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 101))
         (global.set $'name' 
             (call $apply<refx3>ref 
                 (global.get $String.fromCharCode) 
                 (global.get $self) 
-                (local.get $arguments<array>)
+                (local.get $arguments)
             )
         )
 
-        (local.set $arguments<array> (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 0) (i32.const  80))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 1) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 2) (i32.const 105))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 3) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 4) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 5) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments<array>) (i32.const 6) (i32.const 114))
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const  79))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 102))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 102))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 115))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 116))        
+        (global.set $'byteOffset' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const  76))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 103))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 104))  
+        (global.set $'byteLength' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 108))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 103))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 104)) 
+        (global.set $'length' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 117))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 102))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 102))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 114))
+        (global.set $'buffer' 
+            (call $apply<refx3>ref 
+                (global.get $String.fromCharCode) 
+                (global.get $self) 
+                (local.get $arguments)
+            )
+        )
+
+        (local.set $arguments (call $Array<>ref))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const  80))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const 111))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 105))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 110))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 4) (i32.const 116))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 5) (i32.const 101))
+        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 6) (i32.const 114))
         (global.set $'Pointer' 
             (call $apply<refx3>ref 
                 (global.get $String.fromCharCode) 
                 (global.get $self) 
-                (local.get $arguments<array>)
+                (local.get $arguments)
             )
         )
 
@@ -230,23 +442,49 @@
         )
     )
 
-    (func $Object.fromEntry<refx2>ref
-        (param $key externref)
-        (param $value externref)
-        (result externref)
+    (start $main)
 
-        (call $Object.fromEntries<ref>ref
-            (call $Array.of<refx2>ref
-                (call $Array.of<refx2>ref (local.get $key) (local.get $value))
-                (call $Array.of<refx2>ref (global.get $'configurable') (global.get $true))
-            )
+    (func $Array:push<ref.ref> 
+        (param externref externref) (call $Array:push<refx2> (local.get 0) (local.get 1)))
+
+    (func $Array:push<refx2>
+        (param $this externref)
+        (param $item externref)
+
+        (call $apply<refx3>
+            (global.get $Array:push)
+            (local.get $this)
+            (call $Array.of<ref>ref (local.get $item))
         )
     )
 
-    (start $main)
+    (func $Array:push<ref.fun>
+        (param $this externref)
+        (param $func funcref)
 
-    (func (export "calc")
-        (call $log (i32.load (global.get $OFFSET_STRIDE)))
+        (call $apply<refx3>
+            (global.get $Array:push)
+            (local.get $this)
+            (call $Array.of<fun>ref (local.get $func))
+        )
+    )
+
+    (func $Array:push<ref.i32>
+        (param $this externref)
+        (param $value i32)
+
+        (call $apply<refx3>
+            (global.get $Array:push)
+            (local.get $this)
+            (call $Array.of<i32>ref (local.get $value))
+        )
+    )
+
+    (elem $getter funcref (ref.func $get_byteoffset))
+    (func $get_byteoffset
+        (param $this i32)
+        (result i32)
+        (local.get $this)
     )
 
     (func $align
@@ -538,8 +776,9 @@
         )
 
         (call $Object.create<ref>
-                (local.get $#ptr)
-            )
+            (local.get $#ptr)
+        )
+
         (call $Object:toStringTag<refx2>
             (call $getPrototypeOf<ref>ref (local.get $#ptr))
             (local.get $tagName)
@@ -567,6 +806,9 @@
         (result externref)
 
         (local $#ptr externref)
+        (local $#ref externref)
+        (local $arguments externref)
+
         (local $byteLength i32)
         (local $byteOffset i32)
         
@@ -698,6 +940,48 @@
         (param $ptr* i32)
         (param $value i32)
         (i32.atomic.store offset=12 (local.get $ptr*) (local.get $value))
+    )
+
+    (func (export "getUint16")
+        (param $base* i32)
+        (param $ptr* i32)
+        (result i32)
+        (i32.load16_u offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
+    )
+
+    (func (export "setUint16")
+        (param $base* i32)
+        (param $ptr* i32)
+        (param $value i32)
+        (i32.store16 offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
+    )
+
+    (func (export "getUint32")
+        (param $base* i32)
+        (param $ptr* i32)
+        (result i32)
+        (i32.load offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
+    )
+
+    (func (export "setUint32")
+        (param $base* i32)
+        (param $ptr* i32)
+        (param $value i32)
+        (i32.store offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
+    )
+
+    (func (export "getFloat32")
+        (param $base* i32)
+        (param $ptr* i32)
+        (result f32)
+        (f32.load offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
+    )
+
+    (func (export "setFloat32")
+        (param $base* i32)
+        (param $ptr* i32)
+        (param $value f32)
+        (f32.store offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
     )
 
     (func (export "exit")
