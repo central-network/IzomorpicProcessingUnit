@@ -1,418 +1,554 @@
 <meta charset="utf8" />
 <script type="module">
     // const blob   = new Blob([`onmessage = e => WebAssembly.instantiate(...e.data).then(close);`]);
-    WebAssembly.instantiateStreaming(fetch("mem.wasm"), self).then(async m => {
+    WebAssembly.instantiateStreaming(fetch("instance.wasm"), globalThis).then(module => {
+        module.instance.exports.init(HURRA => {
+            return console.error(HURRA)
 
-        const module = await WebAssembly.compileStreaming(fetch("cpu.wasm"));
-        const blob   = new Blob([`onmessage = e => { e.data[1].push(console); WebAssembly.instantiate(...e.data).then(close); }`]);
-        const url    = URL.createObjectURL(blob);
+            const ptr1 = HURRA.new(Float32Array, 21);
+            console.log(ptr1)
 
-        const e = m.instance.exports;
-        console.warn(e);
-        
-        
-        // const data = [module, [{memory: e.memory}]];
-        // new Worker(url).postMessage(data);
-        // new Worker(url).postMessage(data);
-        // new Worker(url).postMessage(data);
-        
+            console.log(HURRA.Math.add(Float32Array, 12))
+        })
+    });
 
+    0 && WebAssembly.instantiateStreaming(fetch("memory.wasm"), self).then(async m => {
+        console.log(m.instance.exports)
 
-        
-        class Pointer extends Number {
+        const exports = m.instance.exports;
+        const {
+            sigint, malloc,
+            memory, memory: { buffer }, stride
+        } = exports;
 
-            static memoryOffset     = 0;
-            static maxModelCount    = 1e1;
-            static maxVertexCount   = 1e2;	
-            static maxIndiceCount   = 1e3;
+        exports.set_buffer(buffer)
 
-            static getUint32        = e.getUint32;
-            static setUint32        = e.setUint32;
-            static getUint16        = e.getUint16;
-            static setUint16        = e.setUint16;
-            static getFloat32       = e.getFloat32;
-            static setFloat32       = e.setFloat32;
-            static TypedArray       = e.TypedArray;
-            
-            constructor (offset) {
-                super(offset || (Pointer.memoryOffset += 4));
-            }
+        const TArray = Float32Array;
+        const length = 215 * 215;
 
-            static at (offset) {
-                return offset && new this(offset) || null;
-            }
+        const target = exports.new(Float32Array, length);
+        const source = exports.new(Float32Array, length);
+        const values = exports.new(Float32Array, 1);
 
-            static model_index                = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_index");
-            static model_scene                = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_scene");
-            static model_parent               = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_parent");
-            static model_vertices_offset      = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_vertices_offset");
-            static model_vertices_length      = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_vertices_length");
-            static model_indices_offset       = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_indices_offset");
-            static model_indices_length       = this.TypedArray(this.maxModelCount,  Uint32Array,   "model_indices_length");
-            static model_local_position_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x");
-            static model_local_position_x_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x_cos");
-            static model_local_position_x_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_x_sin");
-            static model_local_position_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z");
-            static model_local_position_z_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z_cos");
-            static model_local_position_z_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_z_sin");
-            static model_local_position_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y");
-            static model_local_position_y_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y_cos");
-            static model_local_position_y_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_y_sin");
-            static model_local_position_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w");
-            static model_local_position_w_cos = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w_cos");
-            static model_local_position_w_sin = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_position_w_sin");
-            static model_local_rotation_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_x");
-            static model_local_rotation_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_y");
-            static model_local_rotation_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_z");
-            static model_local_rotation_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_rotation_w");
-            static model_local_scale_x        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_x");
-            static model_local_scale_y        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_y");
-            static model_local_scale_z        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_z");
-            static model_local_scale_w        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_scale_w");
-            static model_local_color_r        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_r");
-            static model_local_color_g        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_g");
-            static model_local_color_b        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_b");
-            static model_local_color_a        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_local_color_a");
-            static model_world_color_r        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_r");
-            static model_world_color_g        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_g");
-            static model_world_color_b        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_b");
-            static model_world_color_a        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_color_a");
-            static model_world_position_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_x");
-            static model_world_position_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_y");
-            static model_world_position_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_z");
-            static model_world_position_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_position_w");
-            static model_world_rotation_x     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_x");
-            static model_world_rotation_y     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_y");
-            static model_world_rotation_z     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_z");
-            static model_world_rotation_w     = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_rotation_w");
-            static model_world_scale_x        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_x");
-            static model_world_scale_y        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_y");
-            static model_world_scale_z        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_z");
-            static model_world_scale_w        = this.TypedArray(this.maxModelCount,  Float32Array,  "model_world_scale_w");
-            static vertex_source_position_x   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_x");
-            static vertex_source_position_y   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_y");
-            static vertex_source_position_z   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_z");
-            static vertex_source_position_w   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_position_w");
-            static vertex_source_fragment_r   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_r");
-            static vertex_source_fragment_g   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_g");
-            static vertex_source_fragment_b   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_b");
-            static vertex_source_fragment_a   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_source_fragment_a");
-            static vertex_render_position_x   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_x");
-            static vertex_render_position_y   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_y");
-            static vertex_render_position_z   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_z");
-            static vertex_render_position_w   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_position_w");
-            static vertex_render_fragment_r   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_r");
-            static vertex_render_fragment_g   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_g");
-            static vertex_render_fragment_b   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_b");
-            static vertex_render_fragment_a   = this.TypedArray(this.maxVertexCount, Float32Array, "vertex_render_fragment_a");
-            static model_vertex_indice        = this.TypedArray(this.maxIndiceCount, Uint16Array,  "model_vertex_indice");
+        // const source$ = exports.new(Uint32Array, 25, true);
+        // const values$ = exports.new(Float32Array, 21);
 
-            get_model_index                  () { return Pointer.getUint32(  Pointer.model_index, this )  };
-            get_model_scene                  () { return Pointer.getUint32(  Pointer.model_scene, this )  };
-            get_model_parent                 () { return Pointer.getUint32(  Pointer.model_parent, this )  };
-            get_model_vertices_offset        () { return Pointer.getUint32(  Pointer.model_vertices_offset, this )  };
-            get_model_vertices_length        () { return Pointer.getUint32(  Pointer.model_vertices_length, this )  };
-            get_model_indices_offset         () { return Pointer.getUint32(  Pointer.model_indices_offset, this )  };
-            get_model_indices_length         () { return Pointer.getUint32(  Pointer.model_indices_length, this )  };
-            get_model_local_position_x       () { return Pointer.getFloat32( Pointer.model_local_position_x, this ) };
-            get_model_local_position_x_cos   () { return Pointer.getFloat32( Pointer.model_local_position_x_cos, this ) };
-            get_model_local_position_x_sin   () { return Pointer.getFloat32( Pointer.model_local_position_x_sin, this ) };
-            get_model_local_position_z       () { return Pointer.getFloat32( Pointer.model_local_position_z, this ) };
-            get_model_local_position_z_cos   () { return Pointer.getFloat32( Pointer.model_local_position_z_cos, this ) };
-            get_model_local_position_z_sin   () { return Pointer.getFloat32( Pointer.model_local_position_z_sin, this ) };
-            get_model_local_position_y       () { return Pointer.getFloat32( Pointer.model_local_position_y, this ) };
-            get_model_local_position_y_cos   () { return Pointer.getFloat32( Pointer.model_local_position_y_cos, this ) };
-            get_model_local_position_y_sin   () { return Pointer.getFloat32( Pointer.model_local_position_y_sin, this ) };
-            get_model_local_position_w       () { return Pointer.getFloat32( Pointer.model_local_position_w, this ) };
-            get_model_local_position_w_cos   () { return Pointer.getFloat32( Pointer.model_local_position_w_cos, this ) };
-            get_model_local_position_w_sin   () { return Pointer.getFloat32( Pointer.model_local_position_w_sin, this ) };
-            get_model_local_rotation_x       () { return Pointer.getFloat32( Pointer.model_local_rotation_x, this ) };
-            get_model_local_rotation_y       () { return Pointer.getFloat32( Pointer.model_local_rotation_y, this ) };
-            get_model_local_rotation_z       () { return Pointer.getFloat32( Pointer.model_local_rotation_z, this ) };
-            get_model_local_rotation_w       () { return Pointer.getFloat32( Pointer.model_local_rotation_w, this ) };
-            get_model_local_scale_x          () { return Pointer.getFloat32( Pointer.model_local_scale_x, this ) };
-            get_model_local_scale_y          () { return Pointer.getFloat32( Pointer.model_local_scale_y, this ) };
-            get_model_local_scale_z          () { return Pointer.getFloat32( Pointer.model_local_scale_z, this ) };
-            get_model_local_scale_w          () { return Pointer.getFloat32( Pointer.model_local_scale_w, this ) };
-            get_model_local_color_r          () { return Pointer.getFloat32( Pointer.model_local_color_r, this ) };
-            get_model_local_color_g          () { return Pointer.getFloat32( Pointer.model_local_color_g, this ) };
-            get_model_local_color_b          () { return Pointer.getFloat32( Pointer.model_local_color_b, this ) };
-            get_model_local_color_a          () { return Pointer.getFloat32( Pointer.model_local_color_a, this ) };
-            get_model_world_color_r          () { return Pointer.getFloat32( Pointer.model_world_color_r, this ) };
-            get_model_world_color_g          () { return Pointer.getFloat32( Pointer.model_world_color_g, this ) };
-            get_model_world_color_b          () { return Pointer.getFloat32( Pointer.model_world_color_b, this ) };
-            get_model_world_color_a          () { return Pointer.getFloat32( Pointer.model_world_color_a, this ) };
-            get_model_world_position_x       () { return Pointer.getFloat32( Pointer.model_world_position_x, this ) };
-            get_model_world_position_y       () { return Pointer.getFloat32( Pointer.model_world_position_y, this ) };
-            get_model_world_position_z       () { return Pointer.getFloat32( Pointer.model_world_position_z, this ) };
-            get_model_world_position_w       () { return Pointer.getFloat32( Pointer.model_world_position_w, this ) };
-            get_model_world_rotation_x       () { return Pointer.getFloat32( Pointer.model_world_rotation_x, this ) };
-            get_model_world_rotation_y       () { return Pointer.getFloat32( Pointer.model_world_rotation_y, this ) };
-            get_model_world_rotation_z       () { return Pointer.getFloat32( Pointer.model_world_rotation_z, this ) };
-            get_model_world_rotation_w       () { return Pointer.getFloat32( Pointer.model_world_rotation_w, this ) };
-            get_model_world_scale_x          () { return Pointer.getFloat32( Pointer.model_world_scale_x, this ) };
-            get_model_world_scale_y          () { return Pointer.getFloat32( Pointer.model_world_scale_y, this ) };
-            get_model_world_scale_z          () { return Pointer.getFloat32( Pointer.model_world_scale_z, this ) };
-            get_model_world_scale_w          () { return Pointer.getFloat32( Pointer.model_world_scale_w, this ) };
-            get_vertex_source_position_x     () { return Pointer.getFloat32( Pointer.vertex_source_position_x, this )};
-            get_vertex_source_position_y     () { return Pointer.getFloat32( Pointer.vertex_source_position_y, this )};
-            get_vertex_source_position_z     () { return Pointer.getFloat32( Pointer.vertex_source_position_z, this )};
-            get_vertex_source_position_w     () { return Pointer.getFloat32( Pointer.vertex_source_position_w, this )};
-            get_vertex_source_fragment_r     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_r, this )};
-            get_vertex_source_fragment_g     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_g, this )};
-            get_vertex_source_fragment_b     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_b, this )};
-            get_vertex_source_fragment_a     () { return Pointer.getFloat32( Pointer.vertex_source_fragment_a, this )};
-            get_vertex_render_position_x     () { return Pointer.getFloat32( Pointer.vertex_render_position_x, this )};
-            get_vertex_render_position_y     () { return Pointer.getFloat32( Pointer.vertex_render_position_y, this )};
-            get_vertex_render_position_z     () { return Pointer.getFloat32( Pointer.vertex_render_position_z, this )};
-            get_vertex_render_position_w     () { return Pointer.getFloat32( Pointer.vertex_render_position_w, this )};
-            get_vertex_render_fragment_r     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_r, this )};
-            get_vertex_render_fragment_g     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_g, this )};
-            get_vertex_render_fragment_b     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_b, this )};
-            get_vertex_render_fragment_a     () { return Pointer.getFloat32( Pointer.vertex_render_fragment_a, this )};
-            get_model_vertex_indice          () { return Pointer.getUint16(  Pointer.model_vertex_indice, this ) };
-            
-            set_model_index                  ( value ) { Pointer.setUint32(  Pointer.model_index, this, value )  };
-            set_model_scene                  ( value ) { Pointer.setUint32(  Pointer.model_scene, this, value )  };
-            set_model_parent                 ( value ) { Pointer.setUint32(  Pointer.model_parent, this, value )  };
-            set_model_vertices_offset        ( value ) { Pointer.setUint32(  Pointer.model_vertices_offset, this, value )  };
-            set_model_vertices_length        ( value ) { Pointer.setUint32(  Pointer.model_vertices_length, this, value )  };
-            set_model_indices_offset         ( value ) { Pointer.setUint32(  Pointer.model_indices_offset, this, value )  };
-            set_model_indices_length         ( value ) { Pointer.setUint32(  Pointer.model_indices_length, this, value )  };
-            set_model_local_position_x       ( value ) { Pointer.setFloat32( Pointer.model_local_position_x, this, value ) };
-            set_model_local_position_x_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_x_cos, this, value ) };
-            set_model_local_position_x_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_x_sin, this, value ) };
-            set_model_local_position_z       ( value ) { Pointer.setFloat32( Pointer.model_local_position_z, this, value ) };
-            set_model_local_position_z_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_z_cos, this, value ) };
-            set_model_local_position_z_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_z_sin, this, value ) };
-            set_model_local_position_y       ( value ) { Pointer.setFloat32( Pointer.model_local_position_y, this, value ) };
-            set_model_local_position_y_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_y_cos, this, value ) };
-            set_model_local_position_y_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_y_sin, this, value ) };
-            set_model_local_position_w       ( value ) { Pointer.setFloat32( Pointer.model_local_position_w, this, value ) };
-            set_model_local_position_w_cos   ( value ) { Pointer.setFloat32( Pointer.model_local_position_w_cos, this, value ) };
-            set_model_local_position_w_sin   ( value ) { Pointer.setFloat32( Pointer.model_local_position_w_sin, this, value ) };
-            set_model_local_rotation_x       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_x, this, value ) };
-            set_model_local_rotation_y       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_y, this, value ) };
-            set_model_local_rotation_z       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_z, this, value ) };
-            set_model_local_rotation_w       ( value ) { Pointer.setFloat32( Pointer.model_local_rotation_w, this, value ) };
-            set_model_local_scale_x          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_x, this, value ) };
-            set_model_local_scale_y          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_y, this, value ) };
-            set_model_local_scale_z          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_z, this, value ) };
-            set_model_local_scale_w          ( value ) { Pointer.setFloat32( Pointer.model_local_scale_w, this, value ) };
-            set_model_local_color_r          ( value ) { Pointer.setFloat32( Pointer.model_local_color_r, this, value ) };
-            set_model_local_color_g          ( value ) { Pointer.setFloat32( Pointer.model_local_color_g, this, value ) };
-            set_model_local_color_b          ( value ) { Pointer.setFloat32( Pointer.model_local_color_b, this, value ) };
-            set_model_local_color_a          ( value ) { Pointer.setFloat32( Pointer.model_local_color_a, this, value ) };
-            set_model_world_color_r          ( value ) { Pointer.setFloat32( Pointer.model_world_color_r, this, value ) };
-            set_model_world_color_g          ( value ) { Pointer.setFloat32( Pointer.model_world_color_g, this, value ) };
-            set_model_world_color_b          ( value ) { Pointer.setFloat32( Pointer.model_world_color_b, this, value ) };
-            set_model_world_color_a          ( value ) { Pointer.setFloat32( Pointer.model_world_color_a, this, value ) };
-            set_model_world_position_x       ( value ) { Pointer.setFloat32( Pointer.model_world_position_x, this, value ) };
-            set_model_world_position_y       ( value ) { Pointer.setFloat32( Pointer.model_world_position_y, this, value ) };
-            set_model_world_position_z       ( value ) { Pointer.setFloat32( Pointer.model_world_position_z, this, value ) };
-            set_model_world_position_w       ( value ) { Pointer.setFloat32( Pointer.model_world_position_w, this, value ) };
-            set_model_world_rotation_x       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_x, this, value ) };
-            set_model_world_rotation_y       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_y, this, value ) };
-            set_model_world_rotation_z       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_z, this, value ) };
-            set_model_world_rotation_w       ( value ) { Pointer.setFloat32( Pointer.model_world_rotation_w, this, value ) };
-            set_model_world_scale_x          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_x, this, value ) };
-            set_model_world_scale_y          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_y, this, value ) };
-            set_model_world_scale_z          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_z, this, value ) };
-            set_model_world_scale_w          ( value ) { Pointer.setFloat32( Pointer.model_world_scale_w, this, value ) };
-            set_vertex_source_position_x     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_x, this, value )};
-            set_vertex_source_position_y     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_y, this, value )};
-            set_vertex_source_position_z     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_z, this, value )};
-            set_vertex_source_position_w     ( value ) { Pointer.setFloat32( Pointer.vertex_source_position_w, this, value )};
-            set_vertex_source_fragment_r     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_r, this, value )};
-            set_vertex_source_fragment_g     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_g, this, value )};
-            set_vertex_source_fragment_b     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_b, this, value )};
-            set_vertex_source_fragment_a     ( value ) { Pointer.setFloat32( Pointer.vertex_source_fragment_a, this, value )};
-            set_vertex_render_position_x     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_x, this, value )};
-            set_vertex_render_position_y     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_y, this, value )};
-            set_vertex_render_position_z     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_z, this, value )};
-            set_vertex_render_position_w     ( value ) { Pointer.setFloat32( Pointer.vertex_render_position_w, this, value )};
-            set_vertex_render_fragment_r     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_r, this, value )};
-            set_vertex_render_fragment_g     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_g, this, value )};
-            set_vertex_render_fragment_b     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_b, this, value )};
-            set_vertex_render_fragment_a     ( value ) { Pointer.setFloat32( Pointer.vertex_render_fragment_a, this, value )};
-            set_model_vertex_indice          ( value ) { Pointer.setUint16(  Pointer.model_vertex_indice, this, value ) };
-                        
-            static Vector = class extends this {
+        // console.log(source$)
+        // console.log(values$)
 
-                static getter = this.getFloat32;
-                static setter = this.setFloat32;
+        source.forEach((v, i) => source[i] = Math.random())
+        values.forEach((v, i) => values[i] = 100)
 
-                static LocalPosition = class Position extends this {
-                    static base = {
-                        x: this.model_local_position_x,
-                        y: this.model_local_position_y,
-                        z: this.model_local_position_z,
-                        w: this.model_local_position_w,
-                    }
-                };
+        console.log({
+            target,
+            source,
+            values,
+        });
 
-                static WorldPosition = class extends this {
-                    static base = {
-                        x: this.model_world_position_x,
-                        y: this.model_world_position_y,
-                        z: this.model_world_position_z,
-                        w: this.model_world_position_w,
-                    }
-                };
+        const wasm = await WebAssembly.compileStreaming(fetch("worker.wasm"));
+        const data = new Object({ module: wasm, memory });
+        const blob = new Blob([`onmessage = e => {
+            e.data.signal = BroadcastChannel.prototype.postMessage.bind(
+                new BroadcastChannel("cpu"), 0
+            );
+            WebAssembly.instantiate(e.data.module, e).then(close);
+        }`]);
+        const href = URL.createObjectURL(blob);
 
-                static LocalRotation = class Rotation extends this {
-                    static base = {
-                        x: this.model_local_rotation_x,
-                        y: this.model_local_rotation_y,
-                        z: this.model_local_rotation_z,
-                        w: this.model_local_rotation_w,
-                    }
-                };
+        const workers = new Array(navigator.hardwareConcurrency)
+            .fill()
+            .map(() => new Worker(href))
+            ;
 
-                static WorldRotation = class extends this {
-                    static base = {
-                        x: this.model_world_rotation_x,
-                        y: this.model_world_rotation_y,
-                        z: this.model_world_rotation_z,
-                        w: this.model_world_rotation_w,
-                    }
-                };
+        workers.forEach(w => w.postMessage(data));
 
-                static LocalScale = class Scale extends this {
-                    static base = {
-                        x: this.model_local_scale_x,
-                        y: this.model_local_scale_y,
-                        z: this.model_local_scale_z,
-                        w: this.model_local_scale_w,
-                    }
-                };
+        const bch = new BroadcastChannel("cpu");
+        const elem = (target, values, mathop) => exports[[
+            target.constructor.name[0],
+            target.BYTES_PER_ELEMENT,
+            mathop,
+            values.length && (values.length === target.length && "n" || "v") || ""
+        ].filter(Boolean).join("_")];
 
-                static WorldScale = class extends this {
-                    static base = {
-                        x: this.model_world_scale_x,
-                        y: this.model_world_scale_y,
-                        z: this.model_world_scale_z,
-                        w: this.model_world_scale_w,
-                    }
-                };
+        setTimeout(async () => {
 
-                static LocalColor = class Color extends this {
-                    static base = {
-                        r: this.model_local_color_r,
-                        g: this.model_local_color_g,
-                        b: this.model_local_color_b,
-                        a: this.model_local_color_a,
-                    }
-                };
+            const calc = (mathop, target, source = target, values = []) => {
+                return new Promise((done, fail) => {
+                    const func = elem(target, values, mathop);
 
-                static WorldColor = class extends this {
-                    static base = {
-                        r: this.model_world_color_r,
-                        g: this.model_world_color_g,
-                        b: this.model_world_color_b,
-                        a: this.model_world_color_a,
-                    }
-                };
+                    bch.addEventListener("message", done, { once: true });
 
-                static createDescriptor = function (label, target) {
-                    const base      = this.base[ label ];
-
-                    const getter    = this.getter;
-                    const setter    = this.setter;
-
-                    return {
-                        get         : Reflect.apply.bind(Reflect, getter, null, [ base, target ]),
-                        set         : setter.bind(null, base, target ), 
-                        enumerable  : true,
-                    };
-                };
-
-                constructor (offset) {
-                    Object.defineProperties(super(offset), 
-                        Object.fromEntries(Object.keys(new.target.base).map(key =>
-                            Array.of(key, new.target.createDescriptor(key, this))
-                        ))
+                    const args = Array.of(
+                        func,
+                        target.byteLength,
+                        target.byteOffset,
+                        source.byteOffset,
+                        values.byteOffset,
                     );
-                };
+
+                    exports.calc.apply(null, args);
+                })
             };
 
-            static Object = class extends this {
-                static Scene  = class extends this {};
-                static Model  = class extends this {};
-                static Camera = class extends this {
-                    static Perspective = class extends this {};
-                    static Ortographic = class extends this {};
+            const add = calc.bind(null, "add");
+            const sub = calc.bind(null, "sub");
+            const mul = calc.bind(null, "mul");
+            const div = calc.bind(null, "div");
+            const max = calc.bind(null, "max");
+            const min = calc.bind(null, "min");
+            const eq = calc.bind(null, "eq");
+            const ne = calc.bind(null, "ne");
+            const lt = calc.bind(null, "lt");
+            const gt = calc.bind(null, "gt");
+            const le = calc.bind(null, "le");
+            const ge = calc.bind(null, "ge");
+            const floor = calc.bind(null, "floor");
+            const trunc = calc.bind(null, "trunc");
+            const ceil = calc.bind(null, "ceil");
+            const nearest = calc.bind(null, "nearest");
+
+            // const tasks = Array.of(
+            //     ["add", target, source, values],
+            // );
+
+            // tasks.forEach(async task => await calc.apply(null, task))
+
+            await add(target, source, values)
+
+
+            console.warn(target);
+            exports.exit()
+        }, 1021);
+
+
+        return;
+
+        class Pointer extends Number {
+            constructor(offset) { super(offset || Pointer.next()); }
+
+            set tagName(value) {
+                const proto = Object.create(Reflect.getPrototypeOf(this));
+                Reflect.defineProperty(proto, Symbol.toStringTag, { value, writable: true });
+
+                const type = wasm.register_tag_name(value);
+
+                wasm.register_prototype(type, proto);
+                wasm.set_type(this, type);
+                wasm.reload_prototype(this);
+            }
+
+            get_model_index() { return wasm.getUint32(this.base.model_index + this) };
+            get_model_scene() { return wasm.getUint32(this.base.model_scene + this) };
+            get_model_parent() { return wasm.getUint32(this.base.model_parent + this) };
+            get_model_vertices_offset() { return wasm.getUint32(this.base.model_vertices_offset + this) };
+            get_model_vertices_length() { return wasm.getUint32(this.base.model_vertices_length + this) };
+            get_model_indices_offset() { return wasm.getUint32(this.base.model_indices_offset + this) };
+            get_model_indices_length() { return wasm.getUint32(this.base.model_indices_length + this) };
+            get_model_local_position_x() { return wasm.getFloat32(this.base.model_local_position_x + this) };
+            get_model_local_position_x_cos() { return wasm.getFloat32(this.base.model_local_position_x_cos + this) };
+            get_model_local_position_x_sin() { return wasm.getFloat32(this.base.model_local_position_x_sin + this) };
+            get_model_local_position_z() { return wasm.getFloat32(this.base.model_local_position_z + this) };
+            get_model_local_position_z_cos() { return wasm.getFloat32(this.base.model_local_position_z_cos + this) };
+            get_model_local_position_z_sin() { return wasm.getFloat32(this.base.model_local_position_z_sin + this) };
+            get_model_local_position_y() { return wasm.getFloat32(this.base.model_local_position_y + this) };
+            get_model_local_position_y_cos() { return wasm.getFloat32(this.base.model_local_position_y_cos + this) };
+            get_model_local_position_y_sin() { return wasm.getFloat32(this.base.model_local_position_y_sin + this) };
+            get_model_local_position_w() { return wasm.getFloat32(this.base.model_local_position_w + this) };
+            get_model_local_position_w_cos() { return wasm.getFloat32(this.base.model_local_position_w_cos + this) };
+            get_model_local_position_w_sin() { return wasm.getFloat32(this.base.model_local_position_w_sin + this) };
+            get_model_local_rotation_x() { return wasm.getFloat32(this.base.model_local_rotation_x + this) };
+            get_model_local_rotation_y() { return wasm.getFloat32(this.base.model_local_rotation_y + this) };
+            get_model_local_rotation_z() { return wasm.getFloat32(this.base.model_local_rotation_z + this) };
+            get_model_local_rotation_w() { return wasm.getFloat32(this.base.model_local_rotation_w + this) };
+            get_model_local_scale_x() { return wasm.getFloat32(this.base.model_local_scale_x + this) };
+            get_model_local_scale_y() { return wasm.getFloat32(this.base.model_local_scale_y + this) };
+            get_model_local_scale_z() { return wasm.getFloat32(this.base.model_local_scale_z + this) };
+            get_model_local_scale_w() { return wasm.getFloat32(this.base.model_local_scale_w + this) };
+            get_model_local_color_r() { return wasm.getFloat32(this.base.model_local_color_r + this) };
+            get_model_local_color_g() { return wasm.getFloat32(this.base.model_local_color_g + this) };
+            get_model_local_color_b() { return wasm.getFloat32(this.base.model_local_color_b + this) };
+            get_model_local_color_a() { return wasm.getFloat32(this.base.model_local_color_a + this) };
+            get_model_world_color_r() { return wasm.getFloat32(this.base.model_world_color_r + this) };
+            get_model_world_color_g() { return wasm.getFloat32(this.base.model_world_color_g + this) };
+            get_model_world_color_b() { return wasm.getFloat32(this.base.model_world_color_b + this) };
+            get_model_world_color_a() { return wasm.getFloat32(this.base.model_world_color_a + this) };
+            get_model_world_position_x() { return wasm.getFloat32(this.base.model_world_position_x + this) };
+            get_model_world_position_y() { return wasm.getFloat32(this.base.model_world_position_y + this) };
+            get_model_world_position_z() { return wasm.getFloat32(this.base.model_world_position_z + this) };
+            get_model_world_position_w() { return wasm.getFloat32(this.base.model_world_position_w + this) };
+            get_model_world_rotation_x() { return wasm.getFloat32(this.base.model_world_rotation_x + this) };
+            get_model_world_rotation_y() { return wasm.getFloat32(this.base.model_world_rotation_y + this) };
+            get_model_world_rotation_z() { return wasm.getFloat32(this.base.model_world_rotation_z + this) };
+            get_model_world_rotation_w() { return wasm.getFloat32(this.base.model_world_rotation_w + this) };
+            get_model_world_scale_x() { return wasm.getFloat32(this.base.model_world_scale_x + this) };
+            get_model_world_scale_y() { return wasm.getFloat32(this.base.model_world_scale_y + this) };
+            get_model_world_scale_z() { return wasm.getFloat32(this.base.model_world_scale_z + this) };
+            get_model_world_scale_w() { return wasm.getFloat32(this.base.model_world_scale_w + this) };
+            get_vertex_source_position_x() { return wasm.getFloat32(this.base.vertex_source_position_x + this) };
+            get_vertex_source_position_y() { return wasm.getFloat32(this.base.vertex_source_position_y + this) };
+            get_vertex_source_position_z() { return wasm.getFloat32(this.base.vertex_source_position_z + this) };
+            get_vertex_source_position_w() { return wasm.getFloat32(this.base.vertex_source_position_w + this) };
+            get_vertex_source_fragment_r() { return wasm.getFloat32(this.base.vertex_source_fragment_r + this) };
+            get_vertex_source_fragment_g() { return wasm.getFloat32(this.base.vertex_source_fragment_g + this) };
+            get_vertex_source_fragment_b() { return wasm.getFloat32(this.base.vertex_source_fragment_b + this) };
+            get_vertex_source_fragment_a() { return wasm.getFloat32(this.base.vertex_source_fragment_a + this) };
+            get_vertex_render_position_x() { return wasm.getFloat32(this.base.vertex_render_position_x + this) };
+            get_vertex_render_position_y() { return wasm.getFloat32(this.base.vertex_render_position_y + this) };
+            get_vertex_render_position_z() { return wasm.getFloat32(this.base.vertex_render_position_z + this) };
+            get_vertex_render_position_w() { return wasm.getFloat32(this.base.vertex_render_position_w + this) };
+            get_vertex_render_fragment_r() { return wasm.getFloat32(this.base.vertex_render_fragment_r + this) };
+            get_vertex_render_fragment_g() { return wasm.getFloat32(this.base.vertex_render_fragment_g + this) };
+            get_vertex_render_fragment_b() { return wasm.getFloat32(this.base.vertex_render_fragment_b + this) };
+            get_vertex_render_fragment_a() { return wasm.getFloat32(this.base.vertex_render_fragment_a + this) };
+            get_model_vertex_indice() { return wasm.getUint16(this.base.model_vertex_indice + this) };
+
+            set_model_index(value) { wasm.setUint32(this.base.model_index + this, value) };
+            set_model_scene(value) { wasm.setUint32(this.base.model_scene + this, value) };
+            set_model_parent(value) { wasm.setUint32(this.base.model_parent + this, value) };
+            set_model_vertices_offset(value) { wasm.setUint32(this.base.model_vertices_offset + this, value) };
+            set_model_vertices_length(value) { wasm.setUint32(this.base.model_vertices_length + this, value) };
+            set_model_indices_offset(value) { wasm.setUint32(this.base.model_indices_offset + this, value) };
+            set_model_indices_length(value) { wasm.setUint32(this.base.model_indices_length + this, value) };
+            set_model_local_position_x(value) { wasm.setFloat32(this.base.model_local_position_x + this, value) };
+            set_model_local_position_x_cos(value) { wasm.setFloat32(this.base.model_local_position_x_cos + this, value) };
+            set_model_local_position_x_sin(value) { wasm.setFloat32(this.base.model_local_position_x_sin + this, value) };
+            set_model_local_position_z(value) { wasm.setFloat32(this.base.model_local_position_z + this, value) };
+            set_model_local_position_z_cos(value) { wasm.setFloat32(this.base.model_local_position_z_cos + this, value) };
+            set_model_local_position_z_sin(value) { wasm.setFloat32(this.base.model_local_position_z_sin + this, value) };
+            set_model_local_position_y(value) { wasm.setFloat32(this.base.model_local_position_y + this, value) };
+            set_model_local_position_y_cos(value) { wasm.setFloat32(this.base.model_local_position_y_cos + this, value) };
+            set_model_local_position_y_sin(value) { wasm.setFloat32(this.base.model_local_position_y_sin + this, value) };
+            set_model_local_position_w(value) { wasm.setFloat32(this.base.model_local_position_w + this, value) };
+            set_model_local_position_w_cos(value) { wasm.setFloat32(this.base.model_local_position_w_cos + this, value) };
+            set_model_local_position_w_sin(value) { wasm.setFloat32(this.base.model_local_position_w_sin + this, value) };
+            set_model_local_rotation_x(value) { wasm.setFloat32(this.base.model_local_rotation_x + this, value) };
+            set_model_local_rotation_y(value) { wasm.setFloat32(this.base.model_local_rotation_y + this, value) };
+            set_model_local_rotation_z(value) { wasm.setFloat32(this.base.model_local_rotation_z + this, value) };
+            set_model_local_rotation_w(value) { wasm.setFloat32(this.base.model_local_rotation_w + this, value) };
+            set_model_local_scale_x(value) { wasm.setFloat32(this.base.model_local_scale_x + this, value) };
+            set_model_local_scale_y(value) { wasm.setFloat32(this.base.model_local_scale_y + this, value) };
+            set_model_local_scale_z(value) { wasm.setFloat32(this.base.model_local_scale_z + this, value) };
+            set_model_local_scale_w(value) { wasm.setFloat32(this.base.model_local_scale_w + this, value) };
+            set_model_local_color_r(value) { wasm.setFloat32(this.base.model_local_color_r + this, value) };
+            set_model_local_color_g(value) { wasm.setFloat32(this.base.model_local_color_g + this, value) };
+            set_model_local_color_b(value) { wasm.setFloat32(this.base.model_local_color_b + this, value) };
+            set_model_local_color_a(value) { wasm.setFloat32(this.base.model_local_color_a + this, value) };
+            set_model_world_color_r(value) { wasm.setFloat32(this.base.model_world_color_r + this, value) };
+            set_model_world_color_g(value) { wasm.setFloat32(this.base.model_world_color_g + this, value) };
+            set_model_world_color_b(value) { wasm.setFloat32(this.base.model_world_color_b + this, value) };
+            set_model_world_color_a(value) { wasm.setFloat32(this.base.model_world_color_a + this, value) };
+            set_model_world_position_x(value) { wasm.setFloat32(this.base.model_world_position_x + this, value) };
+            set_model_world_position_y(value) { wasm.setFloat32(this.base.model_world_position_y + this, value) };
+            set_model_world_position_z(value) { wasm.setFloat32(this.base.model_world_position_z + this, value) };
+            set_model_world_position_w(value) { wasm.setFloat32(this.base.model_world_position_w + this, value) };
+            set_model_world_rotation_x(value) { wasm.setFloat32(this.base.model_world_rotation_x + this, value) };
+            set_model_world_rotation_y(value) { wasm.setFloat32(this.base.model_world_rotation_y + this, value) };
+            set_model_world_rotation_z(value) { wasm.setFloat32(this.base.model_world_rotation_z + this, value) };
+            set_model_world_rotation_w(value) { wasm.setFloat32(this.base.model_world_rotation_w + this, value) };
+            set_model_world_scale_x(value) { wasm.setFloat32(this.base.model_world_scale_x + this, value) };
+            set_model_world_scale_y(value) { wasm.setFloat32(this.base.model_world_scale_y + this, value) };
+            set_model_world_scale_z(value) { wasm.setFloat32(this.base.model_world_scale_z + this, value) };
+            set_model_world_scale_w(value) { wasm.setFloat32(this.base.model_world_scale_w + this, value) };
+            set_vertex_source_position_x(value) { wasm.setFloat32(this.base.vertex_source_position_x + this, value) };
+            set_vertex_source_position_y(value) { wasm.setFloat32(this.base.vertex_source_position_y + this, value) };
+            set_vertex_source_position_z(value) { wasm.setFloat32(this.base.vertex_source_position_z + this, value) };
+            set_vertex_source_position_w(value) { wasm.setFloat32(this.base.vertex_source_position_w + this, value) };
+            set_vertex_source_fragment_r(value) { wasm.setFloat32(this.base.vertex_source_fragment_r + this, value) };
+            set_vertex_source_fragment_g(value) { wasm.setFloat32(this.base.vertex_source_fragment_g + this, value) };
+            set_vertex_source_fragment_b(value) { wasm.setFloat32(this.base.vertex_source_fragment_b + this, value) };
+            set_vertex_source_fragment_a(value) { wasm.setFloat32(this.base.vertex_source_fragment_a + this, value) };
+            set_vertex_render_position_x(value) { wasm.setFloat32(this.base.vertex_render_position_x + this, value) };
+            set_vertex_render_position_y(value) { wasm.setFloat32(this.base.vertex_render_position_y + this, value) };
+            set_vertex_render_position_z(value) { wasm.setFloat32(this.base.vertex_render_position_z + this, value) };
+            set_vertex_render_position_w(value) { wasm.setFloat32(this.base.vertex_render_position_w + this, value) };
+            set_vertex_render_fragment_r(value) { wasm.setFloat32(this.base.vertex_render_fragment_r + this, value) };
+            set_vertex_render_fragment_g(value) { wasm.setFloat32(this.base.vertex_render_fragment_g + this, value) };
+            set_vertex_render_fragment_b(value) { wasm.setFloat32(this.base.vertex_render_fragment_b + this, value) };
+            set_vertex_render_fragment_a(value) { wasm.setFloat32(this.base.vertex_render_fragment_a + this, value) };
+            set_model_vertex_indice(value) { wasm.setUint16(this.base.model_vertex_indice + this, value) };
+
+            static TypedArray = class extends this {
+                constructor(length, tagName) {
+                    super(wasm.TypedArray(length, new.target.NativeClass, tagName))
                 };
+
+                get ["[[ArrayView]]"]() {
+                    let NativeClass = this.constructor.NativeClass;
+                    return new NativeClass(this.buffer, this, wasm.get_length(this))
+                }
             };
+            static Vector = class extends this { };
+            static Object3D = class extends this { };
+            static LocalPosition = class Position extends this.Vector { };
+            static LocalRotation = class Rotation extends this.Vector { };
+            static LocalScale = class Scale extends this.Vector { };
+            static LocalColor = class Color extends this.Vector { };
+            static WorldPosition = class extends this.Vector { };
+            static WorldRotation = class extends this.Vector { };
+            static WorldScale = class extends this.Vector { };
+            static WorldColor = class extends this.Vector { };
+            static Scene = class extends this.Object3D { };
+            static Model = class extends this.Object3D { };
+            static Frustrum = class extends this.Object3D { };
+            static Perspective = class extends this.Frustrum { };
+            static Ortographic = class extends this.Frustrum { };
+            static Uint8Array = class extends this.TypedArray { static NativeClass = self.Uint8Array; };
+            static Uint16Array = class extends this.TypedArray { static NativeClass = self.Uint16Array; };
+            static Uint32Array = class extends this.TypedArray { static NativeClass = self.Uint32Array; };
+            static Float32Array = class extends this.TypedArray { static NativeClass = self.Float32Array; };
+
+            static at(offset) {
+                return offset && new this(offset);
+            }
+
+            static next() {
+                return wasm.addUint32(this.base.iterator, 4);
+            }
+
+            static allocate(maxModelCount, maxVertexCount, maxIndiceCount, target = Pointer) {
+                if (!(maxModelCount * maxVertexCount * maxIndiceCount)) {
+                    throw `Counts needed: maxModelCount:${maxModelCount} maxVertexCount:${maxVertexCount} maxIndiceCount:${maxIndiceCount}`
+                }
+
+                Reflect.defineProperty(target, "base", { value: Object(null), writable: true, configurable: true })
+                target.base.iterator = new target.Uint32Array(4);
+                wasm.setUint32(target.base.iterator, 4);
+
+                Reflect.defineProperty(target.prototype, "base", { value: Object(null), writable: true, configurable: true })
+                Reflect.defineProperty(target.prototype, "buffer", { value: wasm.memory.buffer })
+
+                const base = target.prototype.base;
+
+                base.model_index = new target.Uint32Array(maxModelCount, "model_index");
+                base.model_scene = new target.Uint32Array(maxModelCount, "model_scene");
+                base.model_parent = new target.Uint32Array(maxModelCount, "model_parent");
+                base.model_vertices_offset = new target.Uint32Array(maxModelCount, "model_vertices_offset");
+                base.model_vertices_length = new target.Uint32Array(maxModelCount, "model_vertices_length");
+                base.model_indices_offset = new target.Uint32Array(maxModelCount, "model_indices_offset");
+                base.model_indices_length = new target.Uint32Array(maxModelCount, "model_indices_length");
+                base.model_local_position_x = new target.Float32Array(maxModelCount, "model_local_position_x");
+                base.model_local_position_x_cos = new target.Float32Array(maxModelCount, "model_local_position_x_cos");
+                base.model_local_position_x_sin = new target.Float32Array(maxModelCount, "model_local_position_x_sin");
+                base.model_local_position_z = new target.Float32Array(maxModelCount, "model_local_position_z");
+                base.model_local_position_z_cos = new target.Float32Array(maxModelCount, "model_local_position_z_cos");
+                base.model_local_position_z_sin = new target.Float32Array(maxModelCount, "model_local_position_z_sin");
+                base.model_local_position_y = new target.Float32Array(maxModelCount, "model_local_position_y");
+                base.model_local_position_y_cos = new target.Float32Array(maxModelCount, "model_local_position_y_cos");
+                base.model_local_position_y_sin = new target.Float32Array(maxModelCount, "model_local_position_y_sin");
+                base.model_local_position_w = new target.Float32Array(maxModelCount, "model_local_position_w");
+                base.model_local_position_w_cos = new target.Float32Array(maxModelCount, "model_local_position_w_cos");
+                base.model_local_position_w_sin = new target.Float32Array(maxModelCount, "model_local_position_w_sin");
+                base.model_local_rotation_x = new target.Float32Array(maxModelCount, "model_local_rotation_x");
+                base.model_local_rotation_y = new target.Float32Array(maxModelCount, "model_local_rotation_y");
+                base.model_local_rotation_z = new target.Float32Array(maxModelCount, "model_local_rotation_z");
+                base.model_local_rotation_w = new target.Float32Array(maxModelCount, "model_local_rotation_w");
+                base.model_local_scale_x = new target.Float32Array(maxModelCount, "model_local_scale_x");
+                base.model_local_scale_y = new target.Float32Array(maxModelCount, "model_local_scale_y");
+                base.model_local_scale_z = new target.Float32Array(maxModelCount, "model_local_scale_z");
+                base.model_local_scale_w = new target.Float32Array(maxModelCount, "model_local_scale_w");
+                base.model_local_color_r = new target.Float32Array(maxModelCount, "model_local_color_r");
+                base.model_local_color_g = new target.Float32Array(maxModelCount, "model_local_color_g");
+                base.model_local_color_b = new target.Float32Array(maxModelCount, "model_local_color_b");
+                base.model_local_color_a = new target.Float32Array(maxModelCount, "model_local_color_a");
+                base.model_world_color_r = new target.Float32Array(maxModelCount, "model_world_color_r");
+                base.model_world_color_g = new target.Float32Array(maxModelCount, "model_world_color_g");
+                base.model_world_color_b = new target.Float32Array(maxModelCount, "model_world_color_b");
+                base.model_world_color_a = new target.Float32Array(maxModelCount, "model_world_color_a");
+                base.model_world_position_x = new target.Float32Array(maxModelCount, "model_world_position_x");
+                base.model_world_position_y = new target.Float32Array(maxModelCount, "model_world_position_y");
+                base.model_world_position_z = new target.Float32Array(maxModelCount, "model_world_position_z");
+                base.model_world_position_w = new target.Float32Array(maxModelCount, "model_world_position_w");
+                base.model_world_rotation_x = new target.Float32Array(maxModelCount, "model_world_rotation_x");
+                base.model_world_rotation_y = new target.Float32Array(maxModelCount, "model_world_rotation_y");
+                base.model_world_rotation_z = new target.Float32Array(maxModelCount, "model_world_rotation_z");
+                base.model_world_rotation_w = new target.Float32Array(maxModelCount, "model_world_rotation_w");
+                base.model_world_scale_x = new target.Float32Array(maxModelCount, "model_world_scale_x");
+                base.model_world_scale_y = new target.Float32Array(maxModelCount, "model_world_scale_y");
+                base.model_world_scale_z = new target.Float32Array(maxModelCount, "model_world_scale_z");
+                base.model_world_scale_w = new target.Float32Array(maxModelCount, "model_world_scale_w");
+                base.vertex_source_position_x = new target.Float32Array(maxVertexCount, "vertex_source_position_x");
+                base.vertex_source_position_y = new target.Float32Array(maxVertexCount, "vertex_source_position_y");
+                base.vertex_source_position_z = new target.Float32Array(maxVertexCount, "vertex_source_position_z");
+                base.vertex_source_position_w = new target.Float32Array(maxVertexCount, "vertex_source_position_w");
+                base.vertex_source_fragment_r = new target.Float32Array(maxVertexCount, "vertex_source_fragment_r");
+                base.vertex_source_fragment_g = new target.Float32Array(maxVertexCount, "vertex_source_fragment_g");
+                base.vertex_source_fragment_b = new target.Float32Array(maxVertexCount, "vertex_source_fragment_b");
+                base.vertex_source_fragment_a = new target.Float32Array(maxVertexCount, "vertex_source_fragment_a");
+                base.vertex_render_position_x = new target.Float32Array(maxVertexCount, "vertex_render_position_x");
+                base.vertex_render_position_y = new target.Float32Array(maxVertexCount, "vertex_render_position_y");
+                base.vertex_render_position_z = new target.Float32Array(maxVertexCount, "vertex_render_position_z");
+                base.vertex_render_position_w = new target.Float32Array(maxVertexCount, "vertex_render_position_w");
+                base.vertex_render_fragment_r = new target.Float32Array(maxVertexCount, "vertex_render_fragment_r");
+                base.vertex_render_fragment_g = new target.Float32Array(maxVertexCount, "vertex_render_fragment_g");
+                base.vertex_render_fragment_b = new target.Float32Array(maxVertexCount, "vertex_render_fragment_b");
+                base.vertex_render_fragment_a = new target.Float32Array(maxVertexCount, "vertex_render_fragment_a");
+                base.model_vertex_indice = new target.Uint16Array(maxIndiceCount, "model_vertex_indice");
+
+                const { LocalPosition, LocalRotation, LocalScale, LocalColor,
+                    WorldPosition, WorldRotation, WorldScale, WorldColor,
+                    Scene, Model, Object3D, Vector
+                } = target;
+
+                Object.defineProperties(Object3D.prototype, {
+                    position: {
+                        enumerable: true,
+                        get: function () { return LocalPosition.at(this) },
+                        set: function (value) { Object.assign(this.position, Object(value)) }
+                    },
+
+                    rotation: {
+                        enumerable: true,
+                        get: function () { return LocalRotation.at(this) },
+                        set: function (value) { Object.assign(this.rotation, Object(value)) }
+                    },
+                });
+
+                Object.defineProperties(Model.prototype, {
+                    scale: {
+                        enumerable: true,
+                        get: function () { return LocalScale.at(this) },
+                        set: function (value) { Object.assign(this.scale, Object(value)) }
+                    },
+
+                    scene: {
+                        enumerable: true,
+                        get: function () { return Scene.at(this.get_model_scene()) || this.parent?.scene; },
+                        set: function (value) { (value - this) && this.set_model_scene(value); },
+                    },
+
+                    parent: {
+                        enumerable: true,
+                        get: function () { return Model.at(this.get_model_parent()); },
+                        set: function (value) { (value - this) && this.set_model_parent(value); },
+                    },
+
+                    color: {
+                        enumerable: true,
+                        get: function () { return LocalColor.at(this) },
+                        set: function (value) { Object.assign(this.color, Object(value)) }
+                    },
+                });
+
+                Object.defineProperties(Scene.prototype, {
+                    background: {
+                        enumerable: true,
+                        get: function () { return LocalColor.at(this) },
+                        set: function (value) { Object.assign(this.color, Object(value)) }
+                    },
+                });
+
+                Object.defineProperty(LocalPosition.prototype, "base", {
+                    value: {
+                        x: base.model_local_position_x,
+                        y: base.model_local_position_y,
+                        z: base.model_local_position_z,
+                        w: base.model_local_position_w,
+                    }
+                });
+
+                Object.defineProperty(LocalRotation.prototype, "base", {
+                    value: {
+                        x: base.model_local_rotation_x,
+                        y: base.model_local_rotation_y,
+                        z: base.model_local_rotation_z,
+                        w: base.model_local_rotation_w,
+                    }
+                });
+
+                Object.defineProperty(LocalScale.prototype, "base", {
+                    value: {
+                        x: base.model_local_scale_x,
+                        y: base.model_local_scale_y,
+                        z: base.model_local_scale_z,
+                        w: base.model_local_scale_w,
+                    }
+                });
+
+                Object.defineProperty(LocalColor.prototype, "base", {
+                    value: {
+                        r: base.model_local_color_r,
+                        g: base.model_local_color_g,
+                        b: base.model_local_color_b,
+                        a: base.model_local_color_a,
+                    }
+                });
+
+                Object.defineProperty(WorldPosition.prototype, "base", {
+                    value: {
+                        x: base.model_world_position_x,
+                        y: base.model_world_position_y,
+                        z: base.model_world_position_z,
+                        w: base.model_world_position_w,
+                    }
+                });
+
+                Object.defineProperty(WorldRotation.prototype, "base", {
+                    value: {
+                        x: base.model_world_rotation_x,
+                        y: base.model_world_rotation_y,
+                        z: base.model_world_rotation_z,
+                        w: base.model_world_rotation_w,
+                    }
+                });
+
+                Object.defineProperty(WorldScale.prototype, "base", {
+                    value: {
+                        x: base.model_world_scale_x,
+                        y: base.model_world_scale_y,
+                        z: base.model_world_scale_z,
+                        w: base.model_world_scale_w,
+                    }
+                });
+
+                Object.defineProperty(WorldColor.prototype, "base", {
+                    value: {
+                        r: base.model_world_color_r,
+                        g: base.model_world_color_g,
+                        b: base.model_world_color_b,
+                        a: base.model_world_color_a,
+                    }
+                });
+
+                Array.of(
+                    LocalPosition, LocalRotation, LocalScale, LocalColor,
+                    WorldPosition, WorldRotation, WorldScale, WorldColor,
+                ).map(c => c.prototype).forEach(Prototype => {
+                    Reflect.ownKeys(Prototype.base).forEach(key => {
+                        const base = Reflect.get(Prototype.base, key);
+                        Reflect.defineProperty(Prototype, key, {
+                            get: function () { return wasm.getFloat32(this + base) },
+                            set: function (value) { wasm.setFloat32(this + base, value) },
+                            enumerable: true,
+                        });
+                    })
+                });
+            }
         };
 
-        const { 
-            Vector : { 
-                LocalPosition, LocalRotation, LocalScale, LocalColor,
-                WorldPosition, WorldRotation, WorldScale, WorldColor, },
-            Object : { 
-                Scene, Model, Camera, 
-            Camera : { 
-                Perspective, Ortographic }}, 
-        } = Pointer;
+        const { Scene, Model, Perspective, allocate } = Pointer;
 
-        Object.defineProperties( Pointer.Object.prototype, {
-            position : { enumerable : true, 
-                get : function () { return new LocalPosition( this ) }, 
-                set : function ( value ) { Object.assign(this.position, Object(value)) } 
-            },
-
-            rotation : { enumerable : true, 
-                get : function () { return new LocalRotation( this ) }, 
-                set : function ( value ) { Object.assign(this.rotation, Object(value)) } 
-            },
-        });
-
-
-        Object.defineProperties( Model.prototype, {
-            scale : { enumerable : true, 
-                get : function () { return new LocalScale( this ) }, 
-                set : function ( value ) { Object.assign(this.scale, Object(value)) } 
-            },
-                        
-            scene : { enumerable : true, 
-                get : function () { return Scene.at(this.get_model_scene()); }, 
-                set : function ( value ) { this.set_model_scene(value || 0); }, 
-            },
-
-            parent : { enumerable : true, 
-                get : function () { return Model.at(this.get_model_parent()); }, 
-                set : function ( value ) { this.set_model_parent(value || 0); }, 
-            },
-
-            color : { enumerable : true, 
-                get : function () { return new LocalColor( this ) }, 
-                set : function ( value ) { Object.assign(this.color, Object(value)) } 
-            },
-        });
-
-
-        Object.defineProperties( Scene.prototype, {
-            background : { enumerable : true, 
-                get : function () { return new LocalColor( this ) }, 
-                set : function ( value ) { Object.assign(this.color, Object(value)) } 
-            },
-        });
-
+        allocate(100, 1000, 4000);
 
         const scene = new Scene();
 
-        console.log(scene);
-
         const m1 = new Model();
-        const m2 = new Model(8);
+        const m2 = new Model();
         const m3 = new Model();
 
+        m1.parent = m2;
         m2.parent = m3;
-        m3.scene = scene;
 
+        m2.scene = scene;
+        const camera = new Perspective();
+        m3.tagName = "M3"
+
+        console.log(scene);
+        console.log(camera);
         console.log(m1);
         console.log(m2);
-        console.log(m3);        
+        console.log(m3);
+
+
+        console.warn(wasm.get_type(Scene.base.iterator))
     })
 </script>

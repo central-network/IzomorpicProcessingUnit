@@ -1,1020 +1,445 @@
-(module
-    (import "console" "log" (func $log (param i32)))
-    (import "console" "log" (func $log<ref> (param externref)))
-    (import "console" "warn" (func $console.warn<ref> (param externref)))
+(module 
+    (memory $memory 100 65536 shared)
+    (global $onready mut extern)
 
-    (import "Reflect" "get"                         (func $get<refx2>ref (param externref externref) (result externref)))
-    (import "Reflect" "get"                         (func $get<ref.ref>ref (param externref externref) (result externref)))
-    (import "Reflect" "set"                         (func $set<refx3> (param externref externref externref)))
-    (import "Reflect" "set"                         (func $set<ref.i32x2> (param externref i32 i32)))
-    (import "Reflect" "set"                         (func $set<ref.ref.ref> (param externref externref externref)))
-    (import "Reflect" "set"                         (func $set<ref.i32.i32> (param externref i32 i32)))
-    (import "Reflect" "set"                         (func $set<ref.i32.ref> (param externref i32 externref)))
-    (import "Reflect" "apply"                       (func $apply<refx3> (param externref externref externref) (result)))
-    (import "Reflect" "apply"                       (func $apply<refx3>ref (param externref externref externref) (result externref)))
-    (import "Reflect" "construct"                   (func $construct<refx2>ref (param externref externref) (result externref)))
-    (import "Reflect" "defineProperty"              (func $defineProperty<refx3> (param externref externref externref)))
-    (import "Reflect" "getPrototypeOf"              (func $getPrototypeOf<ref>ref (param externref) (result externref)))
-    (import "Reflect" "setPrototypeOf"              (func $setPrototypeOf<refx2> (param externref externref)))
-    (import "Reflect" "getOwnPropertyDescriptor"    (func $getOwnPropertyDescriptor<refx2>ref (param externref externref) (result externref)))
-    
-    (import "self" "Array"                          (func $Array<>ref (param) (result externref)))
-    (import "self" "Object"                         (func $Object<>ref (param) (result externref)))
-    (import "self" "String"                         (func $String<>ref (param) (result externref)))
-    (import "self" "Object"                         (func $Object<ref>ref (param externref) (result externref)))
-    (import "Array" "of"                            (func $Array.of<i32>ref (param i32) (result externref)))
-    (import "Array" "of"                            (func $Array.of<ref>ref (param externref) (result externref)))
-    (import "Array" "of"                            (func $Array.of<fun>ref (param funcref) (result externref)))
-    (import "Array" "of"                            (func $Array.of<refx2>ref (param externref externref) (result externref)))
-    (import "Object" "is"                           (func $Object.is<refx2>i32 (param externref externref) (result i32)))
-    (import "Object" "create"                       (func $Object.create<ref> (param externref) (result)))
-    (import "Object" "create"                       (func $Object.create<ref>ref (param externref) (result externref)))
-    (import "Object" "fromEntries"                  (func $Object.fromEntries<ref>ref (param externref) (result externref)))
-    (import "self" "Boolean"                        (func $Boolean<ref>i32 (param externref) (result i32)))
-    (import "self" "Boolean"                        (func $Boolean<i32>ref (param i32) (result externref)))
-    (import "self" "Number"                         (func $Number<ref>i32 (param externref) (result i32)))
-    (import "self" "Number"                         (func $Number<ref>f32 (param externref) (result f32)))
-    (import "self" "Number"                         (func $Number<i32>ref (param i32) (result externref)))
-    (import "self" "Number"                         (func $Number<f32>ref (param f32) (result externref)))
+    (type $TYPEOF_MATHOP (func (param externref externref externref) (result externref)))
 
-    (import "self" "self"                           (global $self externref))
-    (import "self" "name"                           (global $name externref))
-    (import "self" "NaN"                            (global $NaN externref))
-    (import "self" "undefined"                      (global $undefined externref))
-    (import "self" "Number"                         (global $Number externref))
-    
-    (import "Symbol" "toStringTag"                  (global $Symbol.toStringTag externref))
-    (import "String" "fromCharCode"                 (global $String.fromCharCode externref))
+    (export "memory" (memory $memory))
+    (export "buffer" (global $buffer))
 
-    (import "self" "Array"                          (global $Array externref))
-    (import "Array" "prototype"                     (global $Array.prototype externref))
+    (global $INDEX_MALLOC_LENGTH i32 (i32.const 1))
+    (global $OFFSET_MALLOC_LENGTH i32 (i32.const 4))
+    (global $LENGTH_MALLOC_HEADERS i32 (i32.const 32))
+    (global $PREALLOC_LENGTH i32 (i32.const 32))
 
-    (import "self" "Function"                       (global $Function externref))
-    (import "Function" "prototype"                  (global $Function.prototype externref))
-    (import "Function" "bind"                       (global $Function:bind externref))
+    (global $-OFFSET_BUFFER_SIZE i32 (i32.const -32))
+    (global $-OFFSET_BUFFER_TYPE i32 (i32.const -28))
+    (global $-OFFSET_BYTE_LENGTH i32 (i32.const -24))
+    (global $-OFFSET_BYTE_OFFSET i32 (i32.const -20))
+    (global $-OFFSET_ITEM_LENGTH i32 (i32.const -16))
 
-    (import "self" "Reflect"                        (global $Reflect externref))
-    (import "Reflect" "apply"                       (global $Reflect.apply externref))
+    (global $kType mut extern)
+    (global $memory mut extern)
+    (global $buffer mut extern)
+    (global $stride mut i32)
+    (global $atomics mut extern)
+    (global $imports new Object)
+    (global $concurrency mut i32)
+    (global $HURRA new Object)
+    (global $Math  new Object)
+    (global $Task  new Object)
 
-    (import "self" "Uint8Array"                     (global $Uint8Array externref))
-    (import "self" "Uint16Array"                    (global $Uint16Array externref))
-    (import "self" "Uint32Array"                    (global $Uint32Array externref))
-    (import "self" "Float32Array"                   (global $Float32Array externref))
+    (global $self.Symbol.toStringTag externref)
 
-    (import "Uint8Array" "BYTES_PER_ELEMENT"        (global $Uint8Array.size i32))
-    (import "Uint16Array" "BYTES_PER_ELEMENT"       (global $Uint16Array.size i32))
-    (import "Uint32Array" "BYTES_PER_ELEMENT"       (global $Uint32Array.size i32))
-    (import "Float32Array" "BYTES_PER_ELEMENT"      (global $Float32Array.size i32))
+    (global $self.Uint8Array externref)
+    (global $self.Uint32Array externref)
+    (global $self.Float32Array externref)
+    (global $self.navigator.hardwareConcurrency i32)
 
-    (import "Uint8Array" "name"                     (global $Uint8Array.name externref))
-    (import "Uint16Array" "name"                    (global $Uint16Array.name externref))
-    (import "Uint32Array" "name"                    (global $Uint32Array.name externref))
-    (import "Float32Array" "name"                   (global $Float32Array.name externref))
+    (global $self.TypedArray:buffer/get         externref)
+    (global $self.TypedArray:byteOffset/get     externref)
+    (global $self.TypedArray:byteLength/get     externref)
+    (global $self.TypedArray:length/get         externref)
 
-    (global $Uint8Array.type                        i32 (i32.const 1))
-    (global $Uint16Array.type                       i32 (i32.const 2))
-    (global $Uint32Array.type                       i32 (i32.const 3))
-    (global $Float32Array.type                      i32 (i32.const 4))
+    (global $Uint8Array i32 (i32.const 1))
+    (global $Uint32Array i32 (i32.const 2))
+    (global $Float32Array i32 (i32.const 3))
 
-    (global $true                                   (mut externref) (ref.null extern))
-    (global $false                                  (mut externref) (ref.null extern))
-    (global $null                                   externref (ref.null extern))
-    
-    (global $Array:push                             (mut externref) (ref.null extern))
 
-    (global $'get'          (mut externref) (ref.null extern))
-    (global $'set'          (mut externref) (ref.null extern))
-    (global $'name'         (mut externref) (ref.null extern))
-    (global $'value'        (mut externref) (ref.null extern))
-    (global $'type'         (mut externref) (ref.null extern))
-    (global $'byteOffset'   (mut externref) (ref.null extern))
-    (global $'byteLength'   (mut externref) (ref.null extern))
-    (global $'length'       (mut externref) (ref.null extern))
-    (global $'buffer'       (mut externref) (ref.null extern))
-    (global $'prototype'    (mut externref) (ref.null extern))
-    (global $'enumerable'   (mut externref) (ref.null extern))
-    (global $'configurable' (mut externref) (ref.null extern))
-    (global $'push'         (mut externref) (ref.null extern))
-    (global $'Pointer'      (mut externref) (ref.null extern))
-    
-    (global $#Pointer       (mut externref) (ref.null extern))
-    (global $#Uint8Array    (mut externref) (ref.null extern))
-    (global $#Uint16Array   (mut externref) (ref.null extern))
-    (global $#Uint32Array   (mut externref) (ref.null extern))
-    (global $#Float32Array  (mut externref) (ref.null extern))
+    (func (export "init")
+        (param $onready externref)
 
-    (memory (export "memory") 1 65536 shared)
+        (global.set $concurrency global($self.navigator.hardwareConcurrency))
+        (global.set $stride (i32.mul global($self.navigator.hardwareConcurrency) i32(16)))
+        (i32.atomic.store global($OFFSET_MALLOC_LENGTH) global($PREALLOC_LENGTH))
 
-    (global $LOCK_STATUS_LOCKED i32 (i32.const  1))
-    (global $LOCK_STATUS_IDLE   i32 (i32.const  0))
+        (warn<ref> (text "HURRA starting..."))
 
-    (global $LOCK_STATUS_SELFLOCK  i32 (i32.const  2))
-    (global $LOCK_STATUS_WORKING   i32 (i32.const  3))
-    (global $LOCK_STATUS_SIGINT i32 (i32.const -1))
+        (call $init.kType)
+        (call $init.HURRA)
 
-    (global $TIME_LOCK_DELAY    i64 (i64.const -1))
-
-    (global $OFFSET_ARGS                i32 (i32.const 32))
-    (global $OFFSET_OPERAND             i32 (i32.const 48))
-    (global $LENGTH_MEMORY_HEADERS      i32 (i32.const 64))
-    (global $LENGTH_MALLOC_HEADERS      i32 (i32.const 16))
-
-    (global $OFFSET_ZERO_RESV           i32 (i32.const  0))
-    (global $OFFSET_MALLOC_LENGTH       i32 (i32.const  4))
-    (global $OFFSET_THREAD_COUNT        i32 (i32.const  8))
-    (global $OFFSET_LOCK_STATUS         i32 (i32.const 12))
-
-    (global $OFFSET_PROCESSOR_STAGE     i32 (i32.const 16))
-    (global $OFFSET_CYCLE_COUNT         i32 (i32.const 20))
-    (global $OFFSET_CALC_BYTELENGTH     i32 (i32.const 24))
-    (global $OFFSET_HANDLER_ELEM        i32 (i32.const 28))
-    
-    (global $OFFSET_LENGTH              i32 (i32.const 32))
-    (global $OFFSET_SOURCE              i32 (i32.const 36))
-    (global $OFFSET_VALUES              i32 (i32.const 40))
-    (global $OFFSET_TARGET              i32 (i32.const 44))
-
-    (global $OFFSET_STRIDE              i32 (i32.const 48))
-    (global $OFFSET_SRCADD              i32 (i32.const 52))
-    (global $OFFSET_VALADD              i32 (i32.const 56))
-    (global $OFFSET_DSTADD              i32 (i32.const 60))
-
-    (func $main
-        (v128.store (global.get $OFFSET_ZERO_RESV) (v128.const i32x4 0 64 0 1))
-        (v128.store (global.get $OFFSET_STRIDE) (v128.const i32x4 0 16 16 16))
-        (v128.store (global.get $OFFSET_ARGS) (v128.const i32x4 0 0 0 0))
-
-        (i32.atomic.store 
-            (global.get $OFFSET_LOCK_STATUS)
-            (global.get $LOCK_STATUS_SELFLOCK) (; locked ;)
+        $self.Reflect.apply<refx3>(
+            this null $self.Array.of<ref>ref(
+                global($HURRA)
+            )
         )
-
-        (call $setGlobals)
     )
 
-    (func (export "Base")
-        (param $maxLength i32)
-        (result externref)
+    (func $init.HURRA
+        (local $__proto__ ref)
 
-        (local $byteOffset  externref)
-        (local $byteLength  externref)
-        (local $length      externref)
-        (local $type        externref)
-        (local $base        externref)
+        (local.set $__proto__ 
+            $self.Object.create<ref>ref(
+                $self.Reflect.getPrototypeOf<ref>ref(
+                    global($HURRA)
+                )
+            )
+        )
 
-        (local.set $byteOffset (call $new.Uint32Array<i32>ref (local.get $maxLength)))
-        (local.set $byteLength (call $new.Uint32Array<i32>ref (local.get $maxLength)))
-        (local.set $length     (call $new.Uint32Array<i32>ref (local.get $maxLength)))
-        (local.set $type       (call $new.Uint32Array<i32>ref (local.get $maxLength)))
+        $self.Reflect.defineProperty<refx3>(
+            local($__proto__)
+            global($self.Symbol.toStringTag)
+            $self.Object.fromEntries<ref>ref(
+                $self.Array.of<ref>ref(
+                    $self.Array<refx2>ref(
+                        text("value") 
+                        text("HURRA")
+                    )
+                )
+            )
+        )
 
-        (local.set $base       (call $Object.create<ref>ref (global.get $null)))
+        $self.Reflect.setPrototypeOf<refx2>(global($HURRA) local($__proto__))
+        $self.Reflect.setPrototypeOf<refx2>(global($Math)  null)
+        $self.Reflect.setPrototypeOf<refx2>(global($Task)  null)
+
+
+        $self.Object.create<ref>(global($HURRA))
+
+        $self.Reflect.set<ref.ref.fun>(
+            global($HURRA) text("new") func($new<ref.i32.i32>ref)
+        )
+
+        (call $init.Math)
+
+        $self.Reflect.set<ref.ref.ref>(global($HURRA) text("Task") global($Task))
+
+    )
+
+    (func $init.kType
+        (global.set $kType 
+            $self.Symbol<ref>ref(text("kType"))
+        )
         
-        (call $set<ref.ref.ref> (local.get $base) (global.get $'byteOffset') (local.get $byteOffset))
-        (call $set<ref.ref.ref> (local.get $base) (global.get $'byteLength') (local.get $byteLength))
-        (call $set<ref.ref.ref> (local.get $base) (global.get $'length') (local.get $length))
-        (call $set<ref.ref.ref> (local.get $base) (global.get $'type') (local.get $type))
-
-        (local.get $base)
+        $definePropertyKType<ref.i32>(global($self.Uint8Array) global($Uint8Array))
+        $definePropertyKType<ref.i32>(global($self.Uint32Array) global($Uint32Array))
+        $definePropertyKType<ref.i32>(global($self.Float32Array) global($Float32Array))
     )
 
-    (func $setGlobals
-        (local $arguments externref)
+    (func $init.Math
+        global($HURRA)
+        $self.Reflect.set<ref.ref.ref>(text('Math') global($Math))
 
-        (global.set $true  (call $Boolean<i32>ref (i32.const 1)))
-        (global.set $false (call $Boolean<i32>ref (i32.const 0)))
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 103))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
-        (global.set $'get' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 115))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
-        (global.set $'set' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 112))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
-        (global.set $'type' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 112))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 114))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 121))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 112))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 101))
-        (global.set $'prototype' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 112))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 115))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 104))
-        (global.set $Array:push 
-            (call $get<refx2>ref 
-                (global.get $Array.prototype)
-                (call $apply<refx3>ref 
-                    (global.get $String.fromCharCode) 
-                    (global.get $self) 
-                    (local.get $arguments)
-                )
-            )
-        )
-
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 109))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 114))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 101))
-        (global.set $'enumerable' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const 118))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 4) (i32.const 101))
-        (global.set $'value' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  99))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 105))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 103))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 114))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 10) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 11) (i32.const 101))
-        (global.set $'configurable' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const  97))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 109))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 101))
-        (global.set $'name' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const  79))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 115))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 116))        
-        (global.set $'byteOffset' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 121))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const  76))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  6) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  7) (i32.const 103))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  8) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  9) (i32.const 104))  
-        (global.set $'byteLength' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const 108))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 103))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 104)) 
-        (global.set $'length' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  0) (i32.const  98))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  1) (i32.const 117))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  2) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  3) (i32.const 102))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  4) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const  5) (i32.const 114))
-        (global.set $'buffer' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (local.set $arguments (call $Array<>ref))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 0) (i32.const  80))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 1) (i32.const 111))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 2) (i32.const 105))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 3) (i32.const 110))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 4) (i32.const 116))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 5) (i32.const 101))
-        (call $set<ref.i32.i32> (local.get $arguments) (i32.const 6) (i32.const 114))
-        (global.set $'Pointer' 
-            (call $apply<refx3>ref 
-                (global.get $String.fromCharCode) 
-                (global.get $self) 
-                (local.get $arguments)
-            )
-        )
-
-        (global.set $#Pointer 
-            (call $construct<refx2>ref
-                (global.get $Number)
-                (global.get $self)
-            )
-        )
-
-        (call $Object:toStringTag<refx2> (global.get $#Pointer) (global.get $'Pointer'))
-
-        (global.set $#Uint8Array   (call $Object.create<ref>ref (global.get $#Pointer)))
-        (global.set $#Uint16Array  (call $Object.create<ref>ref (global.get $#Pointer)))
-        (global.set $#Uint32Array  (call $Object.create<ref>ref (global.get $#Pointer)))
-        (global.set $#Float32Array (call $Object.create<ref>ref (global.get $#Pointer)))
-
-        (call $Object:toStringTag<refx2> (global.get $#Uint8Array)   (global.get $Uint8Array.name))
-        (call $Object:toStringTag<refx2> (global.get $#Uint16Array)  (global.get $Uint16Array.name))
-        (call $Object:toStringTag<refx2> (global.get $#Uint32Array)  (global.get $Uint32Array.name))
-        (call $Object:toStringTag<refx2> (global.get $#Float32Array) (global.get $Float32Array.name))
+        global($Math)x16
+        $self.Reflect.set<ref.ref.fun>(text('add')     func($add))
+        $self.Reflect.set<ref.ref.fun>(text('sub')     func($sub))
+        $self.Reflect.set<ref.ref.fun>(text('mul')     func($mul))
+        $self.Reflect.set<ref.ref.fun>(text('div')     func($div))
+        $self.Reflect.set<ref.ref.fun>(text('max')     func($max))
+        $self.Reflect.set<ref.ref.fun>(text('min')     func($min))
+        $self.Reflect.set<ref.ref.fun>(text('eq')      func($eq))
+        $self.Reflect.set<ref.ref.fun>(text('ne')      func($ne))
+        $self.Reflect.set<ref.ref.fun>(text('lt')      func($lt))
+        $self.Reflect.set<ref.ref.fun>(text('gt')      func($gt))
+        $self.Reflect.set<ref.ref.fun>(text('le')      func($le))
+        $self.Reflect.set<ref.ref.fun>(text('ge')      func($ge))
+        $self.Reflect.set<ref.ref.fun>(text('floor')   func($floor))
+        $self.Reflect.set<ref.ref.fun>(text('trunc')   func($trunc))
+        $self.Reflect.set<ref.ref.fun>(text('ceil')    func($ceil))
+        $self.Reflect.set<ref.ref.fun>(text('nearest') func($nearest))        
     )
 
-    (func $Object:toStringTag<refx2>
-        (param $object externref)
-        (param $tagName externref)
+    (func $Math.call<i32.refx3>ref 
+        (param $typeof i32)
+        (param $target ref)
+        (param $source ref)
+        (param $values ref)
+        (result ref)
+        null
+    )
 
-        (call $defineProperty<refx3> 
-            (local.get $object)
-            (global.get $Symbol.toStringTag)
-            (call $Object.fromEntries<ref>ref
-                (call $Array.of<refx2>ref
-                    (call $Array.of<refx2>ref (global.get $'value') (local.get $tagName))
-                    (call $Array.of<refx2>ref (global.get $'configurable') (global.get $true))
-                )
-            )
+    (global $ADD      i32 i32(11))     
+    (global $SUB      i32 i32(12))     
+    (global $MUL      i32 i32(13))     
+    (global $DIV      i32 i32(14))     
+    (global $MAX      i32 i32(15))     
+    (global $MIN      i32 i32(16))     
+    (global $EQ       i32 i32(17))      
+    (global $NE       i32 i32(18))      
+    (global $LT       i32 i32(19))      
+    (global $GT       i32 i32(20))      
+    (global $LE       i32 i32(21))      
+    (global $GE       i32 i32(22))      
+    (global $FLOOR    i32 i32(23))   
+    (global $TRUNC    i32 i32(24))   
+    (global $CEIL     i32 i32(25))    
+    (global $NEAREST  i32 i32(26)) 
+
+    (func $add     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($ADD)     local(0) local(1) local(2)))
+    (func $sub     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($SUB)     local(0) local(1) local(2)))
+    (func $mul     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($MUL)     local(0) local(1) local(2)))
+    (func $div     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($DIV)     local(0) local(1) local(2)))
+    (func $max     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($MAX)     local(0) local(1) local(2)))
+    (func $min     (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($MIN)     local(0) local(1) local(2)))
+    (func $eq      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($EQ)      local(0) local(1) local(2)))
+    (func $ne      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($NE)      local(0) local(1) local(2)))
+    (func $lt      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($LT)      local(0) local(1) local(2)))
+    (func $gt      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($GT)      local(0) local(1) local(2)))
+    (func $le      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($LE)      local(0) local(1) local(2)))
+    (func $ge      (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($GE)      local(0) local(1) local(2)))
+    (func $floor   (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($FLOOR)   local(0) local(1) local(2)))
+    (func $trunc   (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($TRUNC)   local(0) local(1) local(2)))
+    (func $ceil    (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($CEIL)    local(0) local(1) local(2)))
+    (func $nearest (type $TYPEOF_MATHOP) (call $Math.call<i32.refx3>ref global($NEAREST) local(0) local(1) local(2)))
+
+    (func $definePropertyKType<ref.i32>
+        (param $constructor ref)
+        (param $kTypeValue i32)
+        (local $prototype ref)
+        (local $descriptor ref)
+
+        (local.set $descriptor (new $self.Object))
+        (local.set $prototype (get <refx2>ref this text("prototype")))
+        
+        $self.Reflect.set<ref.ref.i32>(
+            local($descriptor) 
+            text("value") 
+            local($kTypeValue)
+        )
+
+        $self.Reflect.defineProperty<refx3>(
+            local($constructor) global($kType) local($descriptor)
+        )
+
+        $self.Reflect.defineProperty<refx3>(
+            local($prototype) global($kType) local($descriptor)
         )
     )
 
-    (start $main)
-
-    (func $Array:push<ref.ref> 
-        (param externref externref) (call $Array:push<refx2> (local.get 0) (local.get 1)))
-
-    (func $Array:push<refx2>
-        (param $this externref)
-        (param $item externref)
-
-        (call $apply<refx3>
-            (global.get $Array:push)
-            (local.get $this)
-            (call $Array.of<ref>ref (local.get $item))
-        )
+    (func $TypedArray:BYTES_PER_ELEMENT<ref>i32
+        (param $this# ref) (result i32) (get <refx2>i32 this text('BYTES_PER_ELEMENT'))
     )
 
-    (func $Array:push<ref.fun>
-        (param $this externref)
-        (param $func funcref)
-
-        (call $apply<refx3>
-            (global.get $Array:push)
-            (local.get $this)
-            (call $Array.of<fun>ref (local.get $func))
-        )
+    (func $TypedArray:buffer<ref>ref
+        (param $this# ref) (result ref)
+        (call $self.Reflect.apply<refx3>ref global($self.TypedArray:buffer/get) this self)
     )
 
-    (func $Array:push<ref.i32>
-        (param $this externref)
-        (param $value i32)
-
-        (call $apply<refx3>
-            (global.get $Array:push)
-            (local.get $this)
-            (call $Array.of<i32>ref (local.get $value))
-        )
+    (func $TypedArray:byteOffset<ref>i32
+        (param $this# ref) (result i32)
+        (call $self.Reflect.apply<refx3>i32 global($self.TypedArray:byteOffset/get) this self)
     )
 
-    (elem $getter funcref (ref.func $get_byteoffset))
-    (func $get_byteoffset
-        (param $this i32)
+    (func $TypedArray:byteLength<ref>i32
+        (param $this# ref) (result i32)
+        (call $self.Reflect.apply<refx3>i32 global($self.TypedArray:byteLength/get) this self)
+    )
+
+    (func $TypedArray:length<ref>i32
+        (param $this# ref) (result i32)
+        (call $self.Reflect.apply<refx3>i32 global($self.TypedArray:length/get) this self)
+    )
+
+    (func $TypedArray:bufferType<ref>i32
+        (param $this# ref) (result i32)
+        (call $self.Reflect.get<refx2>i32 this global($kType))
+    )
+
+    (func $align<i32>i32
+        (param $byteLength i32)
         (result i32)
-        (local.get $this)
-    )
+        (local $remainder i32)
 
-    (func $align
-        (param $length i32)
-        (result i32)
+        (if (i32.le_u local($byteLength) global($stride))
+            (then (return global($stride)))
+        )
 
-        (local $remain i32)
-        (local $stride i32)
-
-        (local.tee $stride (i32.load (global.get $OFFSET_STRIDE)))
-        (if (i32.eqz) (then (local.set $stride (i32.const 16))))
-        (local.set $remain (i32.rem_u (local.get $length) (local.get $stride)))
-
-        (if (local.get $remain)
+        (if (local.tee $remainder
+                (i32.rem_u local($byteLength) global($stride))
+            )
             (then
-                (local.set $length
+                (local.set $byteLength
                     (i32.add
-                        (local.get $length)
-                        (i32.sub 
-                            (local.get $stride) 
-                            (local.get $remain)
-                        )
+                        local($byteLength)
+                        (i32.sub global($stride) local($remainder))
                     )
-                )
+                )   
             )
         )
 
-        (local.get $length)
+        local($byteLength)
     )
 
-    (func $resize (export "resize")
-        (param $byteLength i32)
-        (local $memoryByteLength i32)
-        (local $deltaByteLength i32)
-        (local $deltaPageSize i32)
-
-        (local.set $memoryByteLength
-            (i32.mul (memory.size) (i32.const 65536))
-        )
-
-        (if (i32.lt_u (local.get $memoryByteLength) (local.get $byteLength))
-            (then
-                (local.set $deltaByteLength
-                    (i32.sub (local.get $byteLength) (local.get $memoryByteLength))
-                )
-
-                (local.set $deltaPageSize
-                    (i32.div_u (local.get $deltaByteLength) (i32.const 65536))
-                )
-
-                (if (i32.eqz (local.get $deltaPageSize)) 
-                    (then 
-                        (local.set $deltaPageSize (i32.const 1))
-                    )
-                )
-
-                (memory.grow (local.get $deltaPageSize))
-
-                (drop)
-            )
-        )
-    )
-
-    (func (export "malloc")
-        (param $byteLength i32)
-        (result externref)
-        (call $new.Uint8Array<i32>ref (local.get $byteLength))
-    )
-
-    (func $Uint8Array.is<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-        (call $Object.is<refx2>i32 (local.get $TypedArray) (global.get $Uint8Array))
-    )
-
-    (func $Uint8Array.is<i32>i32
-        (param $type i32)
-        (result i32)
-        (i32.eq (local.get $type) (global.get $Uint8Array.type))
-    )
-
-    (func $Uint16Array.is<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-        (call $Object.is<refx2>i32 (local.get $TypedArray) (global.get $Uint16Array))
-    )
-
-    (func $Uint16Array.is<i32>i32
-        (param $type i32)
-        (result i32)
-        (i32.eq (local.get $type) (global.get $Uint16Array.type))
-    )
-
-    (func $Uint32Array.is<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-        (call $Object.is<refx2>i32 (local.get $TypedArray) (global.get $Uint32Array))
-    )
-
-    (func $Uint32Array.is<i32>i32
-        (param $type i32)
-        (result i32)
-        (i32.eq (local.get $type) (global.get $Uint32Array.type))
-    )
-
-    (func $Float32Array.is<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-        (call $Object.is<refx2>i32 (local.get $TypedArray) (global.get $Float32Array))
-    )
-
-    (func $Float32Array.is<i32>i32
-        (param $type i32)
-        (result i32)
-        (i32.eq (local.get $type) (global.get $Float32Array.type))
-    )
-
-    (func $TypedArray:type<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-
-        (if (call $Boolean<ref>i32 (local.get $TypedArray))
-            (then
-                (if (call $Uint16Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint16Array.type) return) 
-                )
-
-                (if (call $Uint16Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint16Array.type) return) 
-                )
-
-                (if (call $Uint32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint32Array.type) return) 
-                )
-
-                (if (call $Float32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Float32Array.type) return) 
-                )
-            )
-        )
-
-        (global.get $Uint8Array.type)
-    )
-
-    (func $TypedArray:size<ref>i32
-        (param $TypedArray externref)
-        (result i32)
-
-        (if (call $Boolean<ref>i32 (local.get $TypedArray))
-            (then
-                (if (call $Uint8Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint8Array.size) return) 
-                )
-
-                (if (call $Uint16Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint16Array.size) return) 
-                )
-
-                (if (call $Uint32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint32Array.size) return) 
-                )
-
-                (if (call $Float32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Float32Array.size) return) 
-                )
-            )
-        )
-
-        (unreachable)
-    )
-
-    (func $TypedArray:name<ref>ref
-        (param $TypedArray externref)
+    (func $new<ref.i32.i32>ref
+        (param $TypedArray ref)
+        (param $itemLength i32)
+        (param $isPointer i32)
         (result externref)
 
-        (if (call $Boolean<ref>i32 (local.get $TypedArray))
-            (then
-                (if (call $Uint8Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint8Array.name) return) 
-                )
-
-                (if (call $Uint16Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint16Array.name) return) 
-                )
-
-                (if (call $Uint32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Uint32Array.name) return) 
-                )
-
-                (if (call $Float32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $Float32Array.name) return) 
-                )
-            )
-        )
-
-        (unreachable)
-    )
-
-    (func $TypedArray:this<ref>ref
-        (param $TypedArray externref)
-        (result externref)
-
-        (if (call $Boolean<ref>i32 (local.get $TypedArray))
-            (then
-                (if (call $Uint8Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $#Uint8Array) return) 
-                )
-
-                (if (call $Uint16Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $#Uint16Array) return) 
-                )
-
-                (if (call $Uint32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $#Uint32Array) return) 
-                )
-
-                (if (call $Float32Array.is<ref>i32 (local.get $TypedArray))
-                    (then (global.get $#Float32Array) return) 
-                )
-            )
-        )
-
-        (unreachable)
-    )
-
-    (func $new.Uint8Array<i32>ref (export "Uint8Array")
-        (param $length i32)
-        (result externref)
-        (call $new.TypedArray<i32.ref>ref (local.get $length) (global.get $Uint8Array))
-    )
-
-    (func $new.Uint16Array<i32>ref (export "Uint16Array")
-        (param $length i32)
-        (result externref)
-        (call $new.TypedArray<i32.ref>ref (local.get $length) (global.get $Uint16Array))
-    )
-
-    (func $new.Uint32Array<i32>ref (export "Uint32Array")
-        (param $length i32)
-        (result externref)
-        (call $new.TypedArray<i32.ref>ref (local.get $length) (global.get $Uint32Array))
-    )
-    
-    (func $new.Float32Array<i32>ref (export "Float32Array")
-        (param $length i32)
-        (result externref)
-        (call $new.TypedArray<i32.ref>ref (local.get $length) (global.get $Float32Array))
-    )
-
-    (func $isEmpty<ref>i32
-        (param $value externref)
-        (result i32)
-        (i32.eqz (call $Boolean<ref>i32 (local.get $value)))
-    )
-
-    (func $new.TypedArray<i32.ref.ref>ref (export "TypedArray")
-        (param $length i32)
-        (param $TypedArray externref)
-        (param $tagName externref)
-        (result externref)
-
-        (local $#ptr externref)
-        (local $#ref externref)
-
-        (if (call $isEmpty<ref>i32 (local.get $TypedArray))
-            (then (local.set $TypedArray (global.get $Uint8Array)))
-        )
-        
-        (local.set $#ptr 
-            (call $new.Pointer<i32.ref>ref 
-                (local.get $length)
-                (local.get $TypedArray)
-            )
-        )
-
-        (if (call $isEmpty<ref>i32 (local.get $tagName))
-            (then (local.get $#ptr) return)
-        )
-
-        (local.set $#ref 
-            (call $getPrototypeOf<ref>ref 
-                (local.get $#ptr)
-            )
-        )
-
-        (call $setPrototypeOf<refx2>
-            (local.get $#ptr)
-            (call $Object.create<ref>ref (local.get $#ref))
-        )
-
-        (call $Object.create<ref>
-            (local.get $#ptr)
-        )
-
-        (call $Object:toStringTag<refx2>
-            (call $getPrototypeOf<ref>ref (local.get $#ptr))
-            (local.get $tagName)
-        )
-        
-        (local.get $#ptr)
-    )
-
-    (func $new.TypedArray<i32.ref>ref
-        (param $length i32)
-        (param $TypedArray externref)
-        (result externref)
-        (call $new.TypedArray<i32.ref.ref>ref (local.get $length) (local.get $TypedArray) (ref.null extern))
-    )
-
-    (func $new.Pointer<i32>ref
-        (param $length i32)
-        (result externref)
-        (call $new.Pointer<i32.ref>ref (local.get $length) (global.get $Uint8Array))
-    )
-
-    (func $new.Pointer<i32.ref>ref
-        (param $length i32)
-        (param $TypedArray externref)
-        (result externref)
-
-        (local $#ptr externref)
-        (local $#ref externref)
-        (local $arguments externref)
-
+        (local $bufferType i32)
         (local $byteLength i32)
-        (local $byteOffset i32)
-        
-        (local $size i32)
-        (local $type i32)
-
-        (local.set $size (call $TypedArray:size<ref>i32 (local.get $TypedArray)))
-        (local.set $type (call $TypedArray:type<ref>i32 (local.get $TypedArray)))
-
-        (local.set $byteLength (i32.mul (local.get $length) (local.get $size)))
-        (local.set $byteOffset (call $malloc (local.get $byteLength)))
-        
-        (call $set_element_type (local.get $byteOffset) (local.get $type))
-
-        (local.set $#ptr (call $new.Number<i32>ref (local.get $byteOffset)))
-
-        (call $setPrototypeOf<refx2>
-            (local.get $#ptr)
-            (call $TypedArray:this<ref>ref 
-                (local.get $TypedArray)
-            )
-        )
-
-        (call $Object.create<ref> (local.get $#ptr))
-
-        (local.get $#ptr)
-    )
-
-    (func $extend<refx2>ref
-        (param $object externref)
-        (param $prototype externref)
-        (result externref)
-
-        (local $extended externref)
-
-        (local.set $extended (call $Object.create<ref>ref (local.get $object)))
-
-        (call $Object.create<ref> (local.get $extended))
-        (call $setPrototypeOf<refx2> (local.get $extended) (local.get $prototype))
-
-        (local.get $extended)
-    )
-
-    (func $new.Number<i32>ref
-        (param $value i32)
-        (result externref)
-
-        (call $construct<refx2>ref
-            (global.get $Number)
-            (call $Array.of<i32>ref
-                (local.get $value)
-            )
-        )
-    )
-
-    (func $malloc 
-        (param $byteLength i32)
-        (result i32)
         (local $bufferSize i32)
         (local $byteOffset i32)
-        (local $remain i32)
+        (local $typedArray ref)
 
-        (local.set $bufferSize
-            (i32.add 
-                (local.get $byteLength)
-                (global.get $LENGTH_MALLOC_HEADERS)
+        (local.set $bufferType
+            $TypedArray:bufferType<ref>i32(
+                local($TypedArray)
             )
         )
-
-        (local.set $remain (i32.rem_u (local.get $bufferSize) (i32.const 16)))
-
-        (if (local.get $remain) 
-            (then
-                (local.set $remain
-                    (i32.sub 
-                        (i32.const 16)
-                        (local.get $remain)
-                    )
+        
+        (local.set $byteLength
+            (i32.mul
+                local($itemLength)
+                $TypedArray:BYTES_PER_ELEMENT<ref>i32(
+                    local($TypedArray)
                 )
             )
         )
 
         (local.set $bufferSize
-            (i32.add 
-                (local.get $remain)
-                (local.get $bufferSize)
+            $align<i32>i32(
+                (i32.add
+                    local($byteLength)
+                    global($LENGTH_MALLOC_HEADERS)
+                )
             )
         )
 
         (local.set $byteOffset
-            (i32.atomic.rmw.add 
-                (global.get $OFFSET_MALLOC_LENGTH)
-                (local.get $bufferSize)
-            )
-        )
-
-        (call $resize 
-            (i32.add 
-                (local.get $byteOffset)
-                (local.get $bufferSize)
+            (i32.add
+                global($LENGTH_MALLOC_HEADERS)
+                (i32.atomic.rmw.add
+                    global($OFFSET_MALLOC_LENGTH) local($bufferSize)
+                )
             )
         )
         
-        (call $set_buffer_size (local.get $byteOffset) (local.get $bufferSize))
-        (call $set_byte_length (local.get $byteOffset) (local.get $byteLength))
+        (local.set $typedArray
+            $self.Reflect.construct<refx2>ref(
+                local($TypedArray) 
+                $self.Array.of<ref.i32.i32>ref(
+                    global($buffer) local($byteOffset) local($itemLength)
+                )
+            )
+        )
 
-        (local.get $byteOffset)
+        (call $bufferType<i32.i32> local($byteOffset) local($bufferType))
+        (call $bufferSize<i32.i32> local($byteOffset) local($bufferSize))
+        (call $byteLength<i32.i32> local($byteOffset) local($byteLength))
+        (call $itemLength<i32.i32> local($byteOffset) local($itemLength))
+        
+        local($typedArray)
     )
 
-    (func $set_buffer_size
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.atomic.store offset=0 (local.get $ptr*) (local.get $value))
-    )
-
-    (func $set_byte_length
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.atomic.store offset=4 (local.get $ptr*) (local.get $value))
-    )
-
-    (func $set_length
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.atomic.store offset=8 (local.get $ptr*) (local.get $value))
-    )
-
-    (func $set_element_type
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.atomic.store offset=12 (local.get $ptr*) (local.get $value))
-    )
-
-    (func (export "getUint16")
-        (param $base* i32)
-        (param $ptr* i32)
+    (func $malloc<i32>i32
+        (export "malloc")
+        (param $byteLength i32)
         (result i32)
-        (i32.load16_u offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
-    )
+        (local $bufferSize i32)
+        (local $byteOffset i32)
 
-    (func (export "setUint16")
-        (param $base* i32)
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.store16 offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
-    )
-
-    (func (export "getUint32")
-        (param $base* i32)
-        (param $ptr* i32)
-        (result i32)
-        (i32.load offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
-    )
-
-    (func (export "setUint32")
-        (param $base* i32)
-        (param $ptr* i32)
-        (param $value i32)
-        (i32.store offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
-    )
-
-    (func (export "getFloat32")
-        (param $base* i32)
-        (param $ptr* i32)
-        (result f32)
-        (f32.load offset=16 (i32.add (local.get $base*) (local.get $ptr*)))
-    )
-
-    (func (export "setFloat32")
-        (param $base* i32)
-        (param $ptr* i32)
-        (param $value f32)
-        (f32.store offset=16 (i32.add (local.get $base*) (local.get $ptr*)) (local.get $value))
-    )
-
-    (func (export "exit")
-        (i32.atomic.store 
-            (global.get $OFFSET_LOCK_STATUS)
-            (global.get $LOCK_STATUS_SIGINT)
+        (local.set $bufferSize
+            $align<i32>i32(
+                (i32.add global($LENGTH_MALLOC_HEADERS)
+                    local($byteLength)
+                )
+            )
         )
 
-        (memory.atomic.notify
-            (global.get $OFFSET_LOCK_STATUS)
-            (i32.load (global.get $OFFSET_THREAD_COUNT))
+        (local.set $byteOffset
+            (i32.add
+                global($LENGTH_MALLOC_HEADERS)
+                (i32.atomic.rmw.add global($-OFFSET_BUFFER_SIZE) 
+                    local($bufferSize)
+                )
+            )
         )
 
-        (drop)
+        local($byteOffset)
     )
 
-    (func (export "unlock")
-        (i32.atomic.store 
-            (global.get $OFFSET_LOCK_STATUS)
-            (global.get $LOCK_STATUS_WORKING) (; locked ;)
-        )
+    (func $bufferSize<i32.i32>
+        (param $byteOffset i32)
+        (param $bufferSize i32)
 
-        (memory.atomic.notify
-            (global.get $OFFSET_LOCK_STATUS)
-            (i32.load (global.get $OFFSET_THREAD_COUNT))
-        )
-        (call $log )
-
-        (i32.atomic.store 
-            (global.get $OFFSET_LOCK_STATUS)
-            (global.get $LOCK_STATUS_SELFLOCK) (; lock after work ;)
+        (i32.atomic.store
+            (i32.add global($-OFFSET_BUFFER_SIZE)
+                local($byteOffset)
+            )   
+            local($bufferSize)
         )
     )
 
-    (func (export "maxLength") (result i32) (i32.mul (memory.size) (i32.const 1365)))
+    (func $bufferSize<i32>i32
+        (param $byteOffset i32)
+        (result $bufferSize i32)
+
+        (i32.atomic.load
+            (i32.add global($-OFFSET_BUFFER_SIZE)
+                local($byteOffset)
+            )   
+        )
+    )
+
+
+    (func $byteLength<i32.i32>
+        (param $byteOffset i32)
+        (param $byteLength i32)
+
+        (i32.atomic.store
+            (i32.add global($-OFFSET_BYTE_LENGTH)
+                local($byteOffset)
+            )   
+            local($byteLength)
+        )
+    )
+
+    (func $byteLength<i32>i32
+        (param $byteOffset i32)
+        (result $byteLength i32)
+
+        (i32.atomic.load
+            (i32.add global($-OFFSET_BYTE_LENGTH)
+                local($byteOffset)
+            )   
+        )
+    )
+
+
+    (func $bufferType<i32.i32>
+        (param $byteOffset i32)
+        (param $bufferType i32)
+
+        (i32.atomic.store
+            (i32.add global($-OFFSET_BUFFER_TYPE)
+                local($byteOffset)
+            )   
+            local($bufferType)
+        )
+    )
+
+    (func $bufferType<i32>i32
+        (param $byteOffset i32)
+        (result $bufferType i32)
+
+        (i32.atomic.load
+            (i32.add global($-OFFSET_BUFFER_TYPE)
+                local($byteOffset)
+            )   
+        )
+    )
+
+    (func $itemLength<i32.i32>
+        (param $byteOffset i32)
+        (param $itemLength i32)
+
+        (i32.atomic.store
+            (i32.add global($-OFFSET_ITEM_LENGTH)
+                local($byteOffset)
+            )   
+            local($itemLength)
+        )
+    )
+
+    (func $itemLength<i32>i32
+        (param $byteOffset i32)
+        (result $itemLength i32)
+
+        (i32.atomic.load
+            (i32.add global($-OFFSET_ITEM_LENGTH)
+                local($byteOffset)
+            )   
+        )
+    )
 )
