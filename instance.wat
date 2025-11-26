@@ -4,9 +4,21 @@
     (data $wasm:mem "wasm://mem.wat")
     (data $wasm:cpu "wasm://cpu.wat")
 
-    (global $onready mut extern)
+    (global $options mut extern)
+    (global $promise mut extern)
+    (global $resolve mut extern)
 
-    (func (export "init") (param ref)
+    (func (export "init") 
+        (param $options ref) 
+        (result externref)
+        (local $promiseWithResolvers ref)
+
+        (local.set $promiseWithResolvers $self.Promise.withResolvers<>ref())
+        
+        (global.set $options local($options))
+        (global.set $promise (get <refx2>ref local($promiseWithResolvers) text('promise')))
+        (global.set $resolve (get <refx2>ref local($promiseWithResolvers) text('resolve')))
+
         $wasm:mem<fun>(
             (func $on_memory_ready
                 (param $instance ref)
@@ -25,11 +37,13 @@
                 )
 
                 $self.Reflect.apply<refx3>(
-                    local($init) null $self.Array.of<ref>ref(global($onready))
+                    local($init) null $self.Array.of<refx3>ref(
+                        global($options) global($promise) global($resolve)
+                    )
                 )
             )
         )
 
-        (global.set $onready this)
+        global($promise)
     )
 )
