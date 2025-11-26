@@ -2,7 +2,26 @@
 <script type="module">
     WebAssembly.instantiateStreaming(fetch("instance.wasm"), self).then(module => {
         module.instance.exports.init().then(HURRA => {
-            console.warn(self.HURRA = HURRA)
+            self.HURRA = HURRA;
+            console.warn(HURRA)
+
+            const source = HURRA.new(Float32Array, 24);
+            const values = HURRA.new(Float32Array, 24);
+            const target = new Float32Array(24);
+
+            let i = 24;
+            while (i--) source[i] = Math.random();
+            values.fill(100)
+
+            console.log({
+                source, values, target
+            });
+
+            const add = HURRA.add(source, values);
+            console.log(add)
+
+            const nearest = HURRA.nearest(source, target);
+            console.log(nearest)
         });
     });
 </script>
