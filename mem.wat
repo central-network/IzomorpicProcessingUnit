@@ -1,37 +1,37 @@
-(module     
+(module   
+    (data $cpu.wat "wasm://cpu.wat")
+
     (export "memory"                     (memory $memory))
     (export "buffer"                     (global $buffer))
 
+    (include "const.wat")
+
     (memory $memory                     1000 65536 shared)
-    (table $__proto__                   100 100 externref)
-    (table $__kTYPE__                   100 100 externref)
+    (table $__proto__                      5000 externref)
+    (table $__kTYPE__                      5000 externref)
 
     (global $INDEX_MALLOC_LENGTH        i32 (i32.const 1))
     (global $OFFSET_MALLOC_LENGTH       i32 (i32.const 4))
     (global $LENGTH_MALLOC_HEADERS     i32 (i32.const 32))
-    (global $PREALLOC_LENGTH           i32 (i32.const 32))
+    (global $PREALLOC_LENGTH           i32 (i32.const 64))
 
-    (global $-OFFSET_BUFFER_SIZE      i32 (i32.const -32))
-    (global $-OFFSET_BUFFER_TYPE      i32 (i32.const -28))
-    (global $-OFFSET_BYTE_LENGTH      i32 (i32.const -24))
-    (global $-OFFSET_BYTE_OFFSET      i32 (i32.const -20))
-    (global $-OFFSET_ITEM_LENGTH      i32 (i32.const -16))
+    ;; Old offsets removed. Using const.wat OFFSET_HEAD_* globals.
 
     (global $kHurraType                        mut extern)
     (global $kReference                        mut extern)
-    (global $options                           new Object)
+    (global $kSignType                         mut extern)
+
     (global $memory                            mut extern)
     (global $buffer                            mut extern)
     (global $HURRA                             new Object)
     (global $HURRA.__proto__                   mut extern)
-    (global $stride                               mut i32)
-    (global $concurrency                          mut i32)
 
     (global $self.navigator.hardwareConcurrency       i32)
     (global $self.String.prototype.toUpperCase  externref)
     (global $self.Symbol.toStringTag            externref)
     (global $self.Uint8Array                    externref)
     (global $self.Uint32Array                   externref)
+    (global $self.Int32Array                    externref)
     (global $self.Float32Array                  externref)
     (global $self.TypedArray:buffer/get         externref)
     (global $self.TypedArray:byteOffset/get     externref)
@@ -39,62 +39,100 @@
     (global $self.TypedArray:length/get         externref)
 
     (global $Number                     i32 (i32.const 0))
-    (global $Uint8Array                 i32 (i32.const 1))
-    (global $Uint32Array                i32 (i32.const 2))
-    (global $Float32Array               i32 (i32.const 3))
-
     (global $NEW                              i32 i32(99))     
-    (global $ADD                              i32 i32(11))     
-    (global $SUB                              i32 i32(12))     
-    (global $MUL                              i32 i32(13))     
-    (global $DIV                              i32 i32(14))     
-    (global $MAX                              i32 i32(15))     
-    (global $MIN                              i32 i32(16))     
-    (global $EQ                               i32 i32(17))      
-    (global $NE                               i32 i32(18))      
-    (global $LT                               i32 i32(19))      
-    (global $GT                               i32 i32(20))      
-    (global $LE                               i32 i32(21))      
-    (global $GE                               i32 i32(22))      
-    (global $FLOOR                            i32 i32(23))   
-    (global $TRUNC                            i32 i32(24))   
-    (global $CEIL                             i32 i32(25))    
-    (global $NEAREST                          i32 i32(26)) 
 
-    (global $SINGLE_VALUE                     i32 i32(50))
-    (global $EXACT_LENGTH                     i32 i32(51))
-    (global $ZERO_UNIFORM                     i32 i32(52))
+    (global $onready mut extern)
+    (global $options new Object)
 
-    (func (export "init")
+    (global $js "onmessage = e => self.Object.assign(self,e.data).WebAssembly.instantiate(wasm,self).then(close)")
+    (global $url mut extern)
+    (global $data new Object)
+    (global $config new Object)
+    (global $workers new Array)
+
+    (global $stride       mut i32)
+    (global $concurrency  mut i32)
+    (global $worker_count mut i32)
+
+    (func (export "start")
         (param $options ref)
-        (param $promise ref)
-        (param $resolve ref)
+        (param $onready ref)
 
-        $init(this)
+        (global.set $options local($options))
+        (global.set $onready local($onready))
 
+        $configure()
+        $spawn:cpu()
+    )
+
+    (func $onspawncomplete
+        (log<ref> global($workers))
+        
         $self.Reflect.apply<refx3>(
-            local($resolve) 
-            local($promise) 
-            Array.of(
-                global($HURRA)
-            )
+            global($onready)
+            null
+            Array.of(global($HURRA))
         )
     )
 
-    (func $init
-        (param $options ref)
+    (func $configure
         (local $descriptor ref)
 
         (i32.atomic.store
-            global($OFFSET_MALLOC_LENGTH)
-            global($PREALLOC_LENGTH)
+            (global.get $OFFSET_HEAP_PTR)
+            (global.get $HEAP_START)
         )
 
-        (global.set $options        Object.assign(global($options) Object(local($options))))
-        (global.set $concurrency    global($self.navigator.hardwareConcurrency))
-        (global.set $stride         (i32.mul global($self.navigator.hardwareConcurrency) i32(16)))
+        (global.set $concurrency
+            $self.Reflect.get<ref.ref>i32(
+                global($options) 
+                text('concurrency')
+            )
+        )
+
+        (if (i32.eqz global($concurrency))
+            (then
+                (global.set $concurrency
+                    global($self.navigator.hardwareConcurrency)
+                )
+            )
+        )
+
+        (if (i32.eqz global($concurrency))
+            (then unreachable)
+        )
+
+        (i32.atomic.store (global.get $OFFSET_CONCURRENCY) (global.get $concurrency))
+
+        $self.Reflect.set<ref.ref.i32>(
+            global($options) 
+            text('concurrency') 
+            global($concurrency)
+        )
+
+        $set_worker_count(
+            global($concurrency)
+        )
+        
+        (i32.atomic.store (global.get $OFFSET_WORKER_COUNT) (global.get $worker_count))
+
+        (global.set $memory Reflect.get(global($options) text('memory')))
+        (global.set $buffer Reflect.get(global($options) text('buffer')))
+
+        Reflect.set(global($data)   text('memory') global($memory))
+        Reflect.set(global($data)   text('buffer') global($buffer))
+        Reflect.set(global($data)   text('wasm')  global($cpu.wat))
+        Reflect.set(global($config) text('name')       text('cpu'))
+
+        (global.set $url 
+            URL.createObjectURL(
+                new Blob(Array.of(global($js))) 
+            ) 
+        )
+
         (global.set $kHurraType     Symbol.for("kType"))
         (global.set $kReference     Symbol.for("kLink"))
+        (global.set $kSignType      Symbol.for("kSign"))
 
         update($__proto__ 
             global($Number) 
@@ -130,6 +168,8 @@
             global($HURRA)
         )
 
+        $define:MathOperator<ref.fun.i32>(text("new")     func($new)     global($NEW))
+
         $define:MathOperator<ref.fun.i32>(text('add')     func($add)     global($ADD))
         $define:MathOperator<ref.fun.i32>(text('sub')     func($sub)     global($SUB))
         $define:MathOperator<ref.fun.i32>(text('mul')     func($mul)     global($MUL))
@@ -146,16 +186,21 @@
         $define:MathOperator<ref.fun.i32>(text('trunc')   func($trunc)   global($TRUNC))
         $define:MathOperator<ref.fun.i32>(text('ceil')    func($ceil)    global($CEIL))
         $define:MathOperator<ref.fun.i32>(text('nearest') func($nearest) global($NEAREST))
-        $define:MathOperator<ref.fun.i32>(text("new")     func($new)     global($NEW))
-
-        
-        $create:PrototypeAndType<ref.i32>(global($self.Uint8Array) global($Uint8Array))
-        $create:PrototypeAndType<ref.i32>(global($self.Uint32Array) global($Uint32Array))
-        $create:PrototypeAndType<ref.i32>(global($self.Float32Array) global($Float32Array))
 
         $create:ValuesLengthType<ref.i32>(text('SINGLE_VALUE') global($SINGLE_VALUE))
         $create:ValuesLengthType<ref.i32>(text('EXACT_LENGTH') global($EXACT_LENGTH))
         $create:ValuesLengthType<ref.i32>(text('ZERO_UNIFORM') global($ZERO_UNIFORM))
+        $create:ValuesLengthType<ref.i32>(text('QUARTER_BITS') global($QUARTER_BITS))
+        $create:ValuesLengthType<ref.i32>(text('HALF_OF_BITS') global($HALF_OF_BITS))
+
+        $create:ValuesLengthType<ref.i32>(text('SIGNED')   global($SIGNED))
+        $create:ValuesLengthType<ref.i32>(text('UNSIGNED') global($UNSIGNED))
+        
+        $create:PrototypeAndType<ref.i32.i32>(global($self.Uint8Array)   global($Uint8Array) global($UNSIGNED))
+        $create:PrototypeAndType<ref.i32.i32>(global($self.Uint32Array)  global($Uint32Array) global($UNSIGNED))
+        $create:PrototypeAndType<ref.i32.i32>(global($self.Float32Array) global($Float32Array) global($SIGNED))
+
+        (log<ref> select($__kTYPE__ global($SIGNED)))
     )
 
     (func $define:MathOperator<ref.fun.i32>
@@ -199,7 +244,7 @@
             local($type)
         )
 
-        (local.set $kHurraType       new($self.Number<i32>ref local($type)))
+        (local.set $kHurraType  new($self.Number<i32>ref local($type)))
         (local.set $name        apply($self.String:toUpperCase local($name)))
         (local.set $prototype   local($kHurraType).__proto__)
         (local.set $__proto__   Object.create(local($prototype)))
@@ -255,7 +300,7 @@
 
         (local $__kTYPE__   ref)
         (local $__proto__   ref)
-        (local $kHurraType       ref)
+        (local $kHurraType  ref)
         (local $prototype   ref)
         (local $descriptor  ref)
 
@@ -289,19 +334,34 @@
             local($type) 
             local($__kTYPE__)
         )
+
+        Reflect.set(
+            local($descriptor) 
+            text('value') 
+            local($__kTYPE__)
+        )
+
+        Reflect.defineProperty(
+            global($HURRA.__proto__) 
+            local($name)
+            local($descriptor)
+        )
     )
 
-    (func $create:PrototypeAndType<ref.i32>
+    (func $create:PrototypeAndType<ref.i32.i32>
         (param $SelfGlobal ref)
         (param $kHurraTypeValue i32)
+        (param $kSignTypeValue i32)
 
         (local $__kTYPE__   ref)
+        (local $__kSIGN__   ref)
         (local $__proto__   ref)
-        (local $kHurraType       ref)
+        (local $kHurraType  ref)
         (local $name        ref)
         (local $prototype   ref)
         (local $descriptor  ref)
 
+        (local.set $__kSIGN__   select($__kTYPE__ local($kSignTypeValue)))
         (local.set $__kTYPE__   new($self.Number<i32>ref local($kHurraTypeValue)))
         (local.set $prototype   local($__kTYPE__).__proto__)
         (local.set $name        local($SelfGlobal).name)
@@ -378,7 +438,21 @@
             local($kHurraTypeValue) 
             local($__kTYPE__)
         )
+
+        Reflect.set(
+            local($descriptor) text('value') local($__kSIGN__)
+        )
+
+        Reflect.defineProperty(
+            local($SelfGlobal) global($kSignType) local($descriptor)
+        )
+
+        Reflect.defineProperty(
+            local($SelfGlobal).prototype global($kSignType) local($descriptor)
+        )
     )
+
+    (import "self" "exec" (func $exec (param i32) (param externref) (param i32) (result externref)))
 
     (func $calc 
         (param $optype i32)
@@ -389,7 +463,10 @@
         (result $task ref)
 
         (local $dataType i32)
+        (local $signType i32)
         (local $operandType i32)
+        (local $variant i32)
+        (local $id i32)
 
         (local $epoch f32)
         (local $length i32)
@@ -404,23 +481,51 @@
         (local.set $epoch         $self.performance.now<>f32())
         (local.set $operandType   $operandType<ref.ref>i32(local($values) local($target)))
         (local.set $dataType      $TypedArray:kType<ref>i32(local($source)))
+        (local.set $signType      $TypedArray:kSign<ref>i32(local($source)))
         (local.set $length        $TypedArray:bufferSize<ref>i32(local($values)))
         (local.set $offset/source $TypedArray:byteOffset<ref>i32(local($source)))
         (local.set $offset/values $TypedArray:byteOffset<ref>i32(local($values)))
         (local.set $offset/target $TypedArray:byteOffset<ref>i32(local($target)))
 
-        (warn<f32.i32x4.refx3> 
-            local($epoch)
-            local($length)
-            local($offset/source)
-            local($offset/values)
-            local($offset/target)
-            select($__kTYPE__ local($optype))
-            select($__kTYPE__ local($dataType))
-            select($__kTYPE__ local($operandType))
-        )  
+        ;; Determine Variant
+        (local.set $variant (global.get $VARIANT_N_S)) ;; Default N.S
 
-        null
+        (if (i32.ge_u (local.get $optype) (i32.const 12))
+            (then
+                (local.set $variant (global.get $VARIANT_0_S)) ;; Unary -> 0.S
+            )
+            (else
+                (if (i32.eq (local.get $length) (i32.const 1))
+                    (then
+                        (local.set $variant (global.get $VARIANT_1_S)) ;; Scalar -> 1.S
+                    )
+                )
+            )
+        )
+
+        ;; Calculate ID: (Op << 7) | (Type << 3) | Variant
+        (local.set $id
+            (i32.or
+                (i32.shl (local.get $optype) (global.get $SHIFT_OP))
+                (i32.or
+                    (i32.shl (local.get $dataType) (global.get $SHIFT_TYPE))
+                    (local.get $variant)
+                )
+            )
+        )
+
+        ;; Write Control Info
+        (i32.atomic.store (global.get $OFFSET_FUNC_INDEX) (local.get $id))
+        (i32.atomic.store (global.get $OFFSET_STRIDE) (i32.mul (global.get $worker_count) (i32.const 16)))
+        (i32.atomic.store (global.get $OFFSET_LOCKED_WORKERS) (i32.const 0))
+
+        ;; Write Task State Vector
+        (i32.atomic.store (global.get $OFFSET_BUFFER_SIZE) (local.get $length)) ;; Using length as buffer size for now (needs alignment logic if strict)
+        (i32.atomic.store (global.get $OFFSET_SOURCE_PTR) (local.get $offset/source))
+        (i32.atomic.store (global.get $OFFSET_VALUES_PTR) (local.get $offset/values))
+        (i32.atomic.store (global.get $OFFSET_TARGET_PTR) (local.get $offset/target))
+
+        (call $exec (local.get $id) (global.get $buffer) (global.get $worker_count))
     )
 
     (func $import
@@ -547,7 +652,7 @@
         (local.set $byteOffset
             (i32.add
                 global($LENGTH_MALLOC_HEADERS)
-                (i32.atomic.rmw.add global($-OFFSET_BUFFER_SIZE) 
+                (i32.atomic.rmw.add global($OFFSET_HEAP_PTR) 
                     local($bufferSize)
                 )
             )
@@ -614,7 +719,7 @@
             (i32.add
                 global($LENGTH_MALLOC_HEADERS)
                 (i32.atomic.rmw.add
-                    global($OFFSET_MALLOC_LENGTH) 
+                    global($OFFSET_HEAP_PTR) 
                     local($bufferSize)
                 )
             )
@@ -706,6 +811,36 @@
         )
     )
 
+    (func $TypedArray:kSign<ref>i32
+        (param $this# ref) (result i32)
+        (call $self.Reflect.get<refx2>i32 this global($kSignType))
+    )
+
+    (func $TypedArray:kSign<ref>ref
+        (param $this# ref) (result ref)
+        select($__kTYPE__ (call $TypedArray:kSign<ref>i32 this))
+    )
+
+    (func $TypedArray:kSign<ref.i32>
+        (param $this# ref) (param $kSignType i32)
+        (call $TypedArray:kSign<ref.ref> this select($__kTYPE__ local($kSignType)))
+    )
+
+    (func $TypedArray:kSign<ref.ref>
+        (param $this# ref) (param $kSignType ref)
+        (call $self.Reflect.defineProperty<refx3>
+            this 
+            global($kSignType)
+            $self.Object.fromEntries<ref>ref(
+                $self.Array.of<ref>ref(
+                    $self.Array.of<ref.ref>ref(
+                        text('value') local($kSignType)
+                    )
+                )
+            )
+        )
+    )
+
     (func $TypedArray:bufferType<ref>i32
         (param $this# ref) (result i32)
         (call $self.Reflect.get<refx2>i32 this global($kHurraType))
@@ -749,7 +884,7 @@
         (param $bufferSize i32)
 
         (i32.atomic.store
-            (i32.add global($-OFFSET_BUFFER_SIZE)
+            (i32.add (global.get $OFFSET_HEAD_ALIGNED)
                 local($byteOffset)
             )   
             local($bufferSize)
@@ -761,7 +896,7 @@
         (result $bufferSize i32)
 
         (i32.atomic.load
-            (i32.add global($-OFFSET_BUFFER_SIZE)
+            (i32.add (global.get $OFFSET_HEAD_ALIGNED)
                 local($byteOffset)
             )   
         )
@@ -772,7 +907,7 @@
         (param $byteLength i32)
 
         (i32.atomic.store
-            (i32.add global($-OFFSET_BYTE_LENGTH)
+            (i32.add (global.get $OFFSET_HEAD_SIZE)
                 local($byteOffset)
             )   
             local($byteLength)
@@ -784,7 +919,7 @@
         (result $byteLength i32)
 
         (i32.atomic.load
-            (i32.add global($-OFFSET_BYTE_LENGTH)
+            (i32.add (global.get $OFFSET_HEAD_SIZE)
                 local($byteOffset)
             )   
         )
@@ -795,7 +930,7 @@
         (param $bufferType i32)
 
         (i32.atomic.store
-            (i32.add global($-OFFSET_BUFFER_TYPE)
+            (i32.add (global.get $OFFSET_HEAD_TYPE)
                 local($byteOffset)
             )   
             local($bufferType)
@@ -807,7 +942,7 @@
         (result $bufferType i32)
 
         (i32.atomic.load
-            (i32.add global($-OFFSET_BUFFER_TYPE)
+            (i32.add (global.get $OFFSET_HEAD_TYPE)
                 local($byteOffset)
             )   
         )
@@ -818,7 +953,7 @@
         (param $itemLength i32)
 
         (i32.atomic.store
-            (i32.add global($-OFFSET_ITEM_LENGTH)
+            (i32.add (global.get $OFFSET_HEAD_COUNT)
                 local($byteOffset)
             )   
             local($itemLength)
@@ -830,9 +965,178 @@
         (result $itemLength i32)
 
         (i32.atomic.load
-            (i32.add global($-OFFSET_ITEM_LENGTH)
+            (i32.add (global.get $OFFSET_HEAD_COUNT)
                 local($byteOffset)
             )   
         )
+    )
+
+    (func $spawn:cpu
+        (local $i i32)
+        (local.set $i $get_worker_count())
+
+        (if (local.get $i)
+            (then
+                (loop $fork 
+                    (call $fork:cpu)
+                    (br_if $fork tee($i local($i)--))
+                )
+            )
+        )
+    )
+
+    (func $onopen
+        (param $event <MessageEvent>)
+        (local $worker <Worker>)
+
+        (local.set $worker
+            Reflect.get(this text('target'))
+        )
+
+        (apply $self.addEventListener<ref.fun>
+            local($worker) (param text('message') func($onmessage))
+        )
+
+        (apply $self.removeEventListener<ref.fun>
+            local($worker) (param text('message') func($onopen))
+        )
+
+        (apply $self.Array:push<ref>
+            global($workers) (param local($worker))
+        )
+
+        (if (i32.eq
+                global($workers).length 
+                global($worker_count)
+            )
+            (then $onspawncomplete())
+        )
+    )
+
+
+    (func $onmessage
+        (param $taskid i32)
+        (log<i32> this)
+    )
+
+    (func $fork:cpu
+        (local $worker <Worker>)
+
+        Reflect.set(global($data) text('wasm') global($cpu.wat))
+        Reflect.set(global($config) text('name') text('cpu'))
+
+        (local.set $worker
+            new Worker(global($url) global($config))
+        )
+
+        (apply $self.addEventListener<ref.fun>
+            local($worker) (param text('message') func($onopen))
+        )
+
+        (; send wasm module and memory ;)
+        (apply $self.Worker:postMessage<ref>
+            local($worker) (param global($data))
+        )
+    )
+
+    (func $set_worker_count
+        (param $concurrency i32)
+
+        (i32.store (i32.const 4) local($concurrency))
+        (global.set $worker_count local($concurrency))
+        (global.set $stride (i32.mul local($concurrency) (i32.const 16)))
+
+        ;; substract vector for vec4(length + offsets)
+        (call $set_operand
+            (i32x4.mul 
+                (v128.const i32x4 -1 1 1 1) 
+                (i32x4.splat global($stride))
+            )
+        )
+    )
+
+    (func $notify
+        (i32.atomic.store 
+            (i32.const 8) 
+            (memory.atomic.notify 
+                (i32.const 0) 
+                (global.get $worker_count)
+            ) 
+        )
+    )
+
+    (func $get_worker_count
+        (result i32)
+        (i32.atomic.load (i32.const 4))
+    )
+
+    (func $set_func
+        (param i32)
+        (i32.atomic.store (i32.const 12) (local.get 0))
+    )
+
+    (func $get_stride 
+        (result i32)
+        (i32.mul (global.get $worker_count) (i32.const 16))
+    )
+
+    (func $get_length 
+        (result i32)
+        (i32.atomic.load (i32.const 16))
+    )
+
+    (func $set_length
+        (param i32)
+
+        (if (i32.rem_u (local.get 0) global($stride))
+            (then unreachable)
+        )
+
+        (i32.atomic.store (i32.const 16) (local.get 0))
+    )
+
+    (func $get_target_offset
+        (result i32)
+        (i32.atomic.load (i32.const 20))
+    )
+
+    (func $set_target_offset
+        (param i32)
+        (i32.atomic.store (i32.const 20) (local.get 0))
+    )
+
+    (func $get_source_offset
+        (result i32)
+        (i32.atomic.load (i32.const 24))
+    )
+
+    (func $set_source_offset
+        (param i32)
+        (i32.atomic.store (i32.const 24) (local.get 0))
+    )
+
+    (func $get_values_offset
+        (result i32)
+        (i32.atomic.load (i32.const 28))
+    )
+
+    (func $set_values_offset
+        (param i32)
+        (i32.atomic.store (i32.const 28) (local.get 0))
+    )
+
+    (func $get_operand
+        (result v128)
+        (v128.load (i32.const 32))
+    )
+
+    (func $set_operand
+        (param v128)
+        (v128.store (i32.const 32) (local.get 0))
+    )
+
+    (func $get_uniform/32
+        (result v128)
+        (v128.load32_splat (call $get_values_offset))
     )
 )

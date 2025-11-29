@@ -1,5 +1,6 @@
 (module
     (import "self" "memory" (memory $memory 100 65536 shared))
+    (import "self" "postMessage" (func $postMessage (param i32)))
 
     (global $worker_count   (mut i32)  (i32.const 0))
     (global $worker_index   (mut i32)  (i32.const 0))
@@ -40,6 +41,8 @@
     )
     
     (start $loop
+        i32(1) 
+        call $postMessage
         call $init
 
         block $sigint

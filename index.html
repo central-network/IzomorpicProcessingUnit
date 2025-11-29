@@ -1,7 +1,33 @@
 <meta charset="utf8" />
 <script type="module">
+    // Define exec function globally for WASM to call
+    self.exec = function (id, buffer, count) {
+        const int32 = new Int32Array(buffer);
+
+        // Task ID is already written by mem.wat to Index 8 (0x20)
+
+        // Write Active Workers to Address 24 (Index 6)
+        Atomics.store(int32, 6, count);
+
+        // Notify Workers (Address 0 / Index 0)
+        Atomics.notify(int32, 10, count);
+
+        // Wait for Completion (Address 24 / Index 6)
+        return (async () => {
+            while (Atomics.load(int32, 6) > 0) {
+                const val = Atomics.load(int32, 6);
+                if (val === 0) break;
+                const { async, value } = Atomics.waitAsync(int32, 6, val);
+                if (async) {
+                    await value;
+                }
+            }
+            return "done";
+        })();
+    };
+
     WebAssembly.instantiateStreaming(fetch("instance.wasm"), self).then(module => {
-        module.instance.exports.init().then(HURRA => {
+        module.instance.exports.start().then(HURRA => {
             self.HURRA = HURRA;
             console.warn(HURRA)
 
@@ -17,11 +43,14 @@
                 source, values, target
             });
 
-            const add = HURRA.add(source, values);
-            console.log(add)
+            // Operations are now async because exec returns a Promise
+            (async () => {
+                const add = await HURRA.add(source, values);
+                console.log('ADD Result:', add);
 
-            const nearest = HURRA.nearest(source, target);
-            console.log(nearest)
+                const nearest = await HURRA.nearest(source, target);
+                console.log('NEAREST Result:', nearest);
+            })();
         });
     });
 </script>
