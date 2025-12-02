@@ -1,37 +1,21 @@
 <script>
-    WebAssembly.instantiateStreaming(fetch("ipu.wasm"), self).then(async wasm => {
+    WebAssembly.instantiateStreaming(fetch("window.wasm"), self).then(wasm => {
         const ipu = wasm.instance.exports;
-        console.warn(ipu);
+        console.error(ipu);
+
+        setTimeout(() => ipu.this.destroy(), 3000)
 
         const source = ipu.new(Float32Array, 12);
         const values = ipu.new(Float32Array, 12);
         const target = ipu.new(Float32Array, 12);
-        const dwtest = ipu.new(DataView, 2440);
 
         console.table([
             { view: source, offset: source.byteOffset, length: source.length, buffer: source.buffer },
             { view: values, offset: values.byteOffset, length: values.length, buffer: values.buffer },
             { view: target, offset: target.byteOffset, length: target.length, buffer: target.buffer },
-            { view: dwtest, offset: dwtest.byteOffset, length: dwtest.byteLength, buffer: dwtest.buffer },
         ]);
 
         const call = ipu.add(source, values, target);
-        console.error("called:", call)
-
-        let ival;
-        ival = setInterval(async () => {
-            try {
-                const call = await ipu.add(source, values, target);
-                console.log("called:", call)
-            }
-            catch {
-                clearInterval(ival)
-            }
-        }, 3000)
-
-
-        setTimeout(() => {
-            console.error(ipu.this.destroy())
-        }, 17500)
+        console.warn(call);
     });
 </script>

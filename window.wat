@@ -1,5 +1,5 @@
 (module
-    (memory 10 10)
+    (memory 1)
     
     (include "shared.wat")
     (compile "worker.wat"
@@ -13,31 +13,28 @@
     (include "headers_io_window.wat")
     (include "handlers_window.wat")
 
-    (global $DEFAULT_MEMORY_INITIAL i32 i32(10))
-    (global $DEFAULT_MEMORY_MAXIMUM i32 i32(65535))
-    (global $DEFAULT_MEMORY_SHARED  i32 true)
+    (global $DEFAULT_MEMORY_INITIAL     i32 i32(10))
+    (global $DEFAULT_MEMORY_MAXIMUM  i32 i32(65535))
+    (global $DEFAULT_MEMORY_SHARED         i32 true)
 
-    (global $sigint            mut i32)
-    (global $module            mut extern)
-    (global $memory            mut extern)
-    (global $buffer            mut extern)
+    (global $sigint                         mut i32)
+    (global $module                      mut extern)
+    (global $memory                      mut extern)
+    (global $buffer                      mut extern)
 
-    (global $dataView          mut extern)
-    (global $i32View           mut extern)
+    (global $i32View                     mut extern)
+    (global $dataView                    mut extern)
+    (global $kSymbol                     mut extern)
+    (global $kSymbol.tag               'kArrayType')
 
-    (global $kSymbol           mut extern)
-    (global $kSymbol.tag       'kArrayType')
-
-    (global $self.DataView      externref)
-    (global $self.Uint8Array    externref)
-    (global $self.Uint16Array   externref)
-    (global $self.Uint32Array   externref)
-    (global $self.Float32Array  externref)
+    (global $self.DataView                externref)
+    (global $self.Uint8Array              externref)
+    (global $self.Uint16Array             externref)
+    (global $self.Uint32Array             externref)
+    (global $self.Float32Array            externref)
     
     (global $self.navigator.deviceMemory        i32)
     (global $self.navigator.hardwareConcurrency i32)
-
-    (start $init (call $create false))
 
     (func $this (export "this"))
 
@@ -90,4 +87,5 @@
         (global.set $kSymbol        null)
     )
 
+    (start $init (call $create false))
 )   
