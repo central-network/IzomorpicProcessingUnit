@@ -13,6 +13,9 @@
     (include "headers_io_window.wat")
     (include "handlers_window.wat")
 
+    (global $kSymbol.tag 'kArrayType')
+    (global $worker.code 'onmessage = e => Object.assign(self,e.data).WebAssembly.instantiate($,self)')
+
     (global $DEFAULT_MEMORY_INITIAL     i32 i32(10))
     (global $DEFAULT_MEMORY_MAXIMUM  i32 i32(65535))
     (global $DEFAULT_MEMORY_SHARED         i32 true)
@@ -25,7 +28,11 @@
     (global $i32View                     mut extern)
     (global $dataView                    mut extern)
     (global $kSymbol                     mut extern)
-    (global $kSymbol.tag               'kArrayType')
+
+    (global $worker.URL                  mut extern)
+    (global $worker.data                 mut extern)
+    (global $worker.config               mut extern)
+    (global $worker.threads               new Array)
 
     (global $self.DataView                externref)
     (global $self.Uint8Array              externref)

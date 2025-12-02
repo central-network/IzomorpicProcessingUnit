@@ -1,9 +1,4 @@
 
-    (global $worker.URL        mut extern)
-    (global $worker.data       mut extern)
-    (global $worker.config     mut extern)
-    (global $worker.script     'onmessage = e => Object.assign(self,e.data).WebAssembly.instantiate($,self)')
-    (global $worker.threads    new Array)
 
     (func $onlastworkeropen<>
         (call $set_ready_state<i32>
@@ -123,7 +118,7 @@
                     (call $self.URL.createObjectURL<ref>ref
                         (new $self.Blob<ref>ref
                             (call $self.Array.of<ref>ref
-                                global($worker.script)
+                                global($worker.code)
                             )
                         )
                     )
