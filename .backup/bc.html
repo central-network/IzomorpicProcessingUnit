@@ -1,0 +1,75 @@
+<script>
+    const bc = new BroadcastChannel("bc");
+
+    const CalcType = new Map();
+    CalcType.set( "f32_add", 1 )
+    CalcType.set( "f32_mul", 2 )
+
+    const DataType = new Map();
+    DataType.set( Float32Array, 24 )
+    DataType.set( Uint32Array, 125 )
+
+    const HEADERS_LENGTH = 8;
+    const HEADERS_BYTE_LENGTH = HEADERS_LENGTH * Uint32Array.BYTES_PER_ELEMENT;
+
+
+    const calcType = CalcType.get("f32_add");
+    const dataType = DataType.get(Float32Array);
+    const srcLength = 4e7;
+    const valLength = srcLength;
+
+    const packetByteLength = HEADERS_BYTE_LENGTH + 
+        ((srcLength + valLength) * Float32Array.BYTES_PER_ELEMENT);
+
+    
+    const buffer     = new ArrayBuffer(packetByteLength);
+    const headers    = new Uint32Array(buffer, 0, HEADERS_LENGTH);
+    const TypedArray = DataType.entries().find(([T, v]) => v === dataType).at(0);
+
+    const srcByteOffset = HEADERS_BYTE_LENGTH;
+    const valByteOffset = srcByteOffset + srcLength * TypedArray.BYTES_PER_ELEMENT;
+
+    const source     = new TypedArray(buffer, srcByteOffset, srcLength);
+    const values     = new TypedArray(buffer, valByteOffset, valLength);
+
+    let uid = 2;
+    
+    headers.set([
+        buffer.byteLength,
+        calcType,
+        dataType,
+        srcByteOffset,
+        srcLength,
+        valByteOffset,
+        valLength,
+        uid
+    ]);
+
+    let t0, t1, to;
+
+    bc.addEventListener("message", e => {
+        t1 = performance.now()
+
+        console.log("calc done:", t1 - t0);
+        console.warn(new Uint32Array(e.data, 0, HEADERS_LENGTH));
+        console.warn(new Float32Array(e.data, HEADERS_BYTE_LENGTH));
+
+        to || setTimeout(cycle, 3000)
+    });
+
+    ondblclick = () => console.error(to = 1, bc.close());
+
+    source.forEach((v,i) => source[i] = Math.random())
+    values.forEach((v,i) => values[i] = Math.random())
+
+    function cycle () {
+        headers[7] = uid++;
+
+        t0 = performance.now()
+        bc.postMessage(buffer)
+        console.log(buffer)
+    }
+
+    cycle()
+
+</script>

@@ -1,13 +1,13 @@
 <script>
-    WebAssembly.instantiateStreaming(fetch("window.wasm"), self).then(wasm => {
-        const ipu = wasm.instance.exports;
-        console.error(ipu);
+    WebAssembly.instantiateStreaming(fetch("cpu.wasm"), self).then(wasm => {
+        const cpu = wasm.instance.exports;
+        console.error({ cpu });
 
-        setTimeout(() => ipu.this.destroy(), 3000)
+        setTimeout(() => cpu.this.destroy(), 3000)
 
-        const source = ipu.new(Float32Array, 12);
-        const values = ipu.new(Float32Array, 12);
-        const target = ipu.new(Float32Array, 12);
+        const source = new Float32Array(12).map(Math.random);
+        const values = cpu.new(Float32Array, 12).fill(100);
+        const target = new Float32Array(12);
 
         console.table([
             { view: source, offset: source.byteOffset, length: source.length, buffer: source.buffer },
@@ -15,7 +15,8 @@
             { view: target, offset: target.byteOffset, length: target.length, buffer: target.buffer },
         ]);
 
-        const call = ipu.add(source, values, target);
+        let call = cpu.mul(source, values, target);
+        call.then(() => console.warn(target))
         console.warn(call);
     });
 </script>

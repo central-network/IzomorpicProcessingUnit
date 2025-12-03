@@ -1,0 +1,117 @@
+<meta charset="utf8" />
+<script type="module">
+    import PU from "./index.js"
+    const _pu = new PU.CPU();
+    // const _pu = new PU.CPU();
+    // const _pu = new PU.GPU();
+    // const _pu = new PU.NPU();
+    // const _pu = new PU.CPU_Native_SingleThread();
+    // const _pu = new PU.CPU_Native_MultiThread_DetachBuffer();
+    // const _pu = new PU.CPU_Native_MultiThread_SharedBuffer();
+
+    const len = 4000000;
+    const tlen = 2 * len + 1;
+    const blen = tlen * Float32Array.BYTES_PER_ELEMENT;
+    
+    let storage,
+        values,
+        source,
+        target;
+        
+    _pu.on("error", async e => {
+        console.error(e)
+    });
+        
+    _pu.on("ready", async e => {
+        
+        if (_pu.view) {
+            _pu.grow(blen);
+            storage = _pu.view.Float32Array.subarray(0, tlen);
+        }
+        else if (_pu.memory?.malloc) {
+            _pu.grow(blen);
+            storage = new Float32Array(_pu.memory.buffer, _pu.memory.malloc(blen), tlen);
+        }
+        
+        storage ??= new Float32Array(tlen);
+
+        values = storage.subarray(0, 1).fill(2.4);
+        source = storage.subarray(1, len+1);
+        target = storage.subarray(-len);
+    
+        source.forEach((v,i) => source[i] = Math.random());
+        
+        const pu = e.target;
+        const t0 = performance.now();
+        
+        let i = 10;
+        while (i--) {
+            try {
+                await pu.f32_add(source, values, target);
+            }
+            catch (e) {
+                console.error(e);
+            }
+            finally {
+                // console.log({ values, source, target });
+            }
+        }
+
+        const t1 = performance.now();
+        
+        console.log("source:", source);
+        console.log("values:", values);
+        console.log("target:", target);
+
+        console.warn("elapsed:", t1 - t0);
+    });
+
+    _pu.init();
+    console.log(_pu)
+    /* 
+    (() => {
+        const npu = new NPU();
+        npu.on("ready", async e => {
+            console.warn("npu ready:", npu)
+    
+            const target = new Float32Array(source.length);
+            const result = await npu.f32_mul( source, values, target );
+            
+            console.log("npu results:", result)
+        });
+    
+        const gpu = new GPU();
+    
+        gpu.on("ready", async e => {
+            console.warn("gpu ready:", e.target)
+    
+            const target = new Float32Array(source.length);
+            const result = await e.target.f32_mul( source, values, target );
+    
+            console.log("gpu results:", result)
+        });
+    
+        const _pu = new CPU();
+        
+        _pu.on("ready", async e => {
+            console.warn("_pu ready:", _pu)
+    
+            const target = new Float32Array(source.length);
+            const result = await _pu.f32_mul( source, values, target );
+    
+            console.log("_pu results:", result)
+    
+            setTimeout(async () => {
+                const result = await _pu.f32_add( source, values, target );
+                console.log("_pu results:", result)
+                npu.destroy()
+                gpu.destroy()
+                _pu.destroy()
+            }, 3000)
+        });
+    
+        gpu.create();
+        _pu.create();
+        npu.create();
+    }); */
+</script>

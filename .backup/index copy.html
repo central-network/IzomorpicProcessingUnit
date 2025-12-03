@@ -1,0 +1,129 @@
+<meta charset="utf8" />
+<script type="module">
+    import { GPU, CPU, NPU } from "./index.js"
+
+    const bc = new BroadcastChannel("bc");
+
+    const CalcType = new Map();
+    CalcType.set( "f32_add", 1 )
+    CalcType.set( "f32_mul", 2 )
+
+    const DataType = new Map();
+    DataType.set( Float32Array, 24 )
+    DataType.set( Uint32Array, 125 )
+
+    const HEADERS_LENGTH = 8;
+    const HEADERS_BYTE_LENGTH = HEADERS_LENGTH * Uint32Array.BYTES_PER_ELEMENT;
+
+    const cpu = new CPU();
+    const gpu = new GPU();
+    const npu = new NPU();
+    const now = performance.now.bind(performance);
+
+    cpu.on("ready", () => { console.log("cpu ready"); gpu.init() })
+    gpu.on("ready", () => { console.log("gpu ready"); npu.init(); })
+    npu.on("ready", () => {
+        console.log("npu ready");
+
+        let t0, t1;
+        bc.onmessage = e => {
+            t0 = now();
+
+            const buffer = e.data;
+            const headers = new Uint32Array(buffer, 0, HEADERS_LENGTH);
+            const [
+                bufferByteLength,
+                calcType,
+                dataType,
+                srcByteOffset,
+                srcLength,
+                valByteOffset,
+                valLength,
+                uid
+            ] = headers;
+    
+            const TypedArray = DataType.entries().find(([T, v]) => v === dataType).at(0);
+            const replyBuffer = new ArrayBuffer(valByteOffset)
+            new Uint32Array(replyBuffer, 0, HEADERS_LENGTH).set(headers);
+    
+            const source = new TypedArray(buffer, srcByteOffset, srcLength);
+            const values = new TypedArray(buffer, valByteOffset, valLength);
+            const target = new TypedArray(replyBuffer, HEADERS_BYTE_LENGTH);
+
+            
+            const caller = CalcType.entries().find(([T, v]) => v === calcType).at(0);
+
+            const npuRatio = 0.1;
+            const gpuRatio = 0.2;
+            const cpuRatio = 1 - (npuRatio + gpuRatio);
+
+            const gpuLength = Math.min(500000, Math.floor(srcLength * gpuRatio));
+            const npuLength = Math.floor(srcLength * npuRatio);
+            const cpuLength = srcLength - (gpuLength + npuLength);
+
+            let gpu_t0, gpu_t1;
+            let cpu_t0, cpu_t1;
+            let npu_t0, npu_t1;
+
+
+            gpu_t0 = now();
+            const _gpu = new Promise(done => {
+                Reflect.apply(gpu[caller], gpu, Array.of(
+                    source.subarray(0, gpuLength), 
+                    values.subarray(0, gpuLength),
+                    target.subarray(0, gpuLength),
+                )).then(() => done(gpu_t1 = now()));
+            });
+
+            cpu_t0 = now();
+            const _cpu = new Promise(done => {
+                Reflect.apply(cpu[caller], cpu, Array.of(
+                    source.subarray(gpuLength, gpuLength + cpuLength), 
+                    values.subarray(gpuLength, gpuLength + cpuLength),
+                    target.subarray(gpuLength, gpuLength + cpuLength),
+                )).then(() => done(cpu_t1 = now()));
+            });
+
+            npu_t0 = now();
+            const _npu = new Promise(done => {
+                Reflect.apply(npu[caller], npu, Array.of(
+                    source.subarray(gpuLength + cpuLength, gpuLength + cpuLength + npuLength), 
+                    values.subarray(gpuLength + cpuLength, gpuLength + cpuLength + npuLength),
+                    target.subarray(gpuLength + cpuLength, gpuLength + cpuLength + npuLength),
+                )).then(() => done(npu_t1 = now()));
+            });
+
+            Promise.all([_gpu, _cpu, _npu]).then(() => {
+                t1 = now();
+
+                console.log("calc done:", t1 - t0);
+                console.table([
+                    { type: "gpu", size: gpuLength, time: gpu_t1 - gpu_t0, ratio: gpuRatio },
+                    { type: "cpu", size: cpuLength, time: cpu_t1 - cpu_t0, ratio: cpuRatio },
+                    { type: "npu", size: npuLength, time: npu_t1 - npu_t0, ratio: npuRatio },
+                ]);
+
+                e.target.postMessage(target.buffer)
+            })
+    
+            console.log({
+                caller, uid, srcLength, valLength, srcByteOffset, valByteOffset
+            })
+        };
+
+        console.log("bc bound");
+
+    })
+
+    ondblclick = async () => {
+        console.error(
+            await cpu.destroy(),
+            await gpu.destroy(),
+            await npu.destroy(),
+            bc.close()
+        )
+    }
+
+    cpu.init()
+
+</script>

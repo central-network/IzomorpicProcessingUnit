@@ -20,32 +20,32 @@
     (global $SHIFT_OP                              i32 (i32.const 7))
 
     ;; ------------------------------------------------------------------------------------------------------------
-    ;; VARIANTS (3 Bits: 0-7)
+    ;; VARIANTS (3 Bits: 1-7)
     ;; ------------------------------------------------------------------------------------------------------------
-    (global $VARIANT_N_S                           i32 (i32.const 0)) ;; Normal / Scalar Source
-    (global $VARIANT_1_S                           i32 (i32.const 1)) ;; 1 Uniform / Scalar Source
-    (global $VARIANT_0_S                           i32 (i32.const 2)) ;; 0 Source (Unary)
-    (global $VARIANT_Q_S                           i32 (i32.const 3)) ;; Quarter Source
-    (global $VARIANT_H_S                           i32 (i32.const 4)) ;; Half Source
-    ;; Reserved 5-7
+    (global $VARIANT_N                             i32 (i32.const 1)) ;; Exact Length
+    (global $VARIANT_1                             i32 (i32.const 2)) ;; 1 Uniform / Scalar Source
+    (global $VARIANT_0                             i32 (i32.const 3)) ;; 0 Source (Unary)
+    (global $VARIANT_Q                             i32 (i32.const 4)) ;; Quarter Source
+    (global $VARIANT_H                             i32 (i32.const 5)) ;; Half Source
+    ;; Reserved 6-7
 
     ;; ------------------------------------------------------------------------------------------------------------
-    ;; TYPES (4 Bits: 0-15)
+    ;; TYPES (4 Bits: 1-15)
     ;; ------------------------------------------------------------------------------------------------------------
-    (global $TYPE_Float32                          i32 (i32.const 0))
-    (global $TYPE_Int32                            i32 (i32.const 1))
-    (global $TYPE_Uint32                           i32 (i32.const 2))
-    (global $TYPE_Int8                             i32 (i32.const 3))
-    (global $TYPE_Uint8                            i32 (i32.const 4))
-    (global $TYPE_Int16                            i32 (i32.const 5))
-    (global $TYPE_Uint16                           i32 (i32.const 6))
-    (global $TYPE_Float64                          i32 (i32.const 7))
-    (global $TYPE_BigInt64                         i32 (i32.const 8))
-    (global $TYPE_BigUint64                        i32 (i32.const 9))
-    ;; Reserved 10-15
+    (global $TYPE_Float32                          i32 (i32.const 1))
+    (global $TYPE_Int32                            i32 (i32.const 2))
+    (global $TYPE_Uint32                           i32 (i32.const 3))
+    (global $TYPE_Int8                             i32 (i32.const 4))
+    (global $TYPE_Uint8                            i32 (i32.const 5))
+    (global $TYPE_Int16                            i32 (i32.const 6))
+    (global $TYPE_Uint16                           i32 (i32.const 7))
+    (global $TYPE_Float64                          i32 (i32.const 8))
+    (global $TYPE_BigInt64                         i32 (i32.const 9))
+    (global $TYPE_BigUint64                        i32 (i32.const 10))
+    ;; Reserved 11-15
 
     ;; ------------------------------------------------------------------------------------------------------------
-    ;; OPERATIONS (6 Bits: 0-63)
+    ;; OPERATIONS (6 Bits: 1-64)
     ;; ------------------------------------------------------------------------------------------------------------
     (global $OP_ADD                                i32 (i32.const 1))
     (global $OP_SUB                                i32 (i32.const 2))
@@ -77,69 +77,68 @@
     ;; ------------------------------------------------------------------------------------------------------------
     ;; PRE-CALCULATED GLOBAL IDs (For Table & Exports)
     ;; Formula: (OP << 7) | (TYPE << 3) | VARIANT
+    ;; Base: Type=1 (Float32) -> Shift 3 -> 8
     ;; ------------------------------------------------------------------------------------------------------------
     
-    ;; ADD (OP=0)
-    ;; Float32 (TYPE=0)
-    (global $Float32Array.ADD.N.S                  i32 (i32.const 0))   ;; (0<<7)|(0<<3)|0 = 0
-    (global $Float32Array.ADD.1.S                  i32 (i32.const 1))   ;; (0<<7)|(0<<3)|1 = 1
+    ;; ADD (OP=1) -> 128
+    (global $f32v_add_n                            i32 (i32.const 137)) ;; 128 + 8 + 1
+    (global $f32v_add_1                            i32 (i32.const 138)) ;; 128 + 8 + 2
 
-    ;; SUB (OP=1)
-    ;; Float32 (TYPE=0)
-    (global $Float32Array.SUB.N.S                  i32 (i32.const 128)) ;; (1<<7)|(0<<3)|0 = 128
-    (global $Float32Array.SUB.1.S                  i32 (i32.const 129)) ;; (1<<7)|(0<<3)|1 = 129
+    ;; SUB (OP=2) -> 256
+    (global $f32v_sub_n                            i32 (i32.const 265)) ;; 256 + 8 + 1
+    (global $f32v_sub_1                            i32 (i32.const 266)) ;; 256 + 8 + 2
 
-    ;; MUL (OP=2)
-    (global $Float32Array.MUL.N.S                  i32 (i32.const 256)) ;; (2<<7)|(0<<3)|0 = 256
-    (global $Float32Array.MUL.1.S                  i32 (i32.const 257)) ;; (2<<7)|(0<<3)|1 = 257
+    ;; MUL (OP=3) -> 384
+    (global $f32v_mul_n                            i32 (i32.const 393)) ;; 384 + 8 + 1
+    (global $f32v_mul_1                            i32 (i32.const 394)) ;; 384 + 8 + 2
 
-    ;; DIV (OP=3)
-    (global $Float32Array.DIV.N.S                  i32 (i32.const 384)) ;; (3<<7)|(0<<3)|0 = 384
-    (global $Float32Array.DIV.1.S                  i32 (i32.const 385)) ;; (3<<7)|(0<<3)|1 = 385
+    ;; DIV (OP=4) -> 512
+    (global $f32v_div_n                            i32 (i32.const 521)) ;; 512 + 8 + 1
+    (global $f32v_div_1                            i32 (i32.const 522)) ;; 512 + 8 + 2
 
-    ;; MAX (OP=4)
-    (global $Float32Array.MAX.N.S                  i32 (i32.const 512))
-    (global $Float32Array.MAX.1.S                  i32 (i32.const 513))
+    ;; MAX (OP=5) -> 640
+    (global $f32v_max_n                            i32 (i32.const 649))
+    (global $f32v_max_1                            i32 (i32.const 650))
 
-    ;; MIN (OP=5)
-    (global $Float32Array.MIN.N.S                  i32 (i32.const 640))
-    (global $Float32Array.MIN.1.S                  i32 (i32.const 641))
+    ;; MIN (OP=6) -> 768
+    (global $f32v_min_n                            i32 (i32.const 777))
+    (global $f32v_min_1                            i32 (i32.const 778))
 
-    ;; EQ (OP=6)
-    (global $Float32Array.EQ.N.S                   i32 (i32.const 768))
-    (global $Float32Array.EQ.1.S                   i32 (i32.const 769))
+    ;; EQ (OP=7) -> 896
+    (global $f32v_eq_n                             i32 (i32.const 905))
+    (global $f32v_eq_1                             i32 (i32.const 906))
 
-    ;; NE (OP=7)
-    (global $Float32Array.NE.N.S                   i32 (i32.const 896))
-    (global $Float32Array.NE.1.S                   i32 (i32.const 897))
+    ;; NE (OP=8) -> 1024
+    (global $f32v_ne_n                             i32 (i32.const 1033))
+    (global $f32v_ne_1                             i32 (i32.const 1034))
 
-    ;; LT (OP=8)
-    (global $Float32Array.LT.N.S                   i32 (i32.const 1024))
-    (global $Float32Array.LT.1.S                   i32 (i32.const 1025))
+    ;; LT (OP=9) -> 1152
+    (global $f32v_lt_n                             i32 (i32.const 1161))
+    (global $f32v_lt_1                             i32 (i32.const 1162))
 
-    ;; GT (OP=9)
-    (global $Float32Array.GT.N.S                   i32 (i32.const 1152))
-    (global $Float32Array.GT.1.S                   i32 (i32.const 1153))
+    ;; GT (OP=10) -> 1280
+    (global $f32v_gt_n                             i32 (i32.const 1289))
+    (global $f32v_gt_1                             i32 (i32.const 1290))
 
-    ;; LE (OP=10)
-    (global $Float32Array.LE.N.S                   i32 (i32.const 1280))
-    (global $Float32Array.LE.1.S                   i32 (i32.const 1281))
+    ;; LE (OP=11) -> 1408
+    (global $f32v_le_n                             i32 (i32.const 1417))
+    (global $f32v_le_1                             i32 (i32.const 1418))
 
-    ;; GE (OP=11)
-    (global $Float32Array.GE.N.S                   i32 (i32.const 1408))
-    (global $Float32Array.GE.1.S                   i32 (i32.const 1409))
+    ;; GE (OP=12) -> 1536
+    (global $f32v_ge_n                             i32 (i32.const 1545))
+    (global $f32v_ge_1                             i32 (i32.const 1546))
 
-    ;; FLOOR (OP=12)
-    (global $Float32Array.FLOOR.0.S                i32 (i32.const 1538)) ;; (12<<7)|(0<<3)|2 = 1536 + 2 = 1538
+    ;; FLOOR (OP=13) -> 1664
+    (global $f32v_floor_0                          i32 (i32.const 1675)) ;; 1664 + 8 + 3
 
-    ;; TRUNC (OP=13)
-    (global $Float32Array.TRUNC.0.S                i32 (i32.const 1666)) ;; (13<<7)|(0<<3)|2 = 1664 + 2 = 1666
+    ;; TRUNC (OP=14) -> 1792
+    (global $f32v_trunc_0                          i32 (i32.const 1803)) ;; 1792 + 8 + 3
 
-    ;; CEIL (OP=14)
-    (global $Float32Array.CEIL.0.S                 i32 (i32.const 1794)) ;; (14<<7)|(0<<3)|2 = 1792 + 2 = 1794
+    ;; CEIL (OP=15) -> 1920
+    (global $f32v_ceil_0                           i32 (i32.const 1931)) ;; 1920 + 8 + 3
 
-    ;; NEAREST (OP=15)
-    (global $Float32Array.NEAREST.0.S              i32 (i32.const 1922)) ;; (15<<7)|(0<<3)|2 = 1920 + 2 = 1922
+    ;; NEAREST (OP=16) -> 2048
+    (global $f32v_nearest_0                        i32 (i32.const 2059)) ;; 2048 + 8 + 3
 
     ;; ------------------------------------------------------------------------------------------------------------
     ;; MEMORY OFFSETS (64-Byte Header)
@@ -196,11 +195,7 @@
     (global $SIGNED                                i32 (i32.const 2))
     (global $UNSIGNED                              i32 (i32.const 3))
 
-    (global $TYPE_DATAVIEW                         i32 (i32.const 1))
-    (global $TYPE_UINT8ARRAY                       i32 (i32.const 2))
-    (global $TYPE_UINT16ARRAY                      i32 (i32.const 3))
-    (global $TYPE_UINT32ARRAY                      i32 (i32.const 4))
-    (global $TYPE_FLOAT32ARRAY                     i32 (i32.const 5))
+    (global $TYPE_DataView                         i32 (i32.const 11)) ;; Added DataView
 
     (global $READY_STATE_CLOSED                    i32 (i32.const 0))
     (global $READY_STATE_OPEN                      i32 (i32.const 1))

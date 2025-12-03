@@ -27,12 +27,18 @@
         global($kSymbol)
     )
 
+    (func $get_self_symbol<ref>i32
+        (param $this ref)
+        (result i32)
+        (call $self.Reflect.get<ref.ref>i32 local($this) (call $get_self_symbol<>ref))
+    )
+
     (func $define_self_symbols<>
-        (call $define_property<ref.ref.i32> global($self.Uint8Array)   (call $get_self_symbol<>ref) global($TYPE_UINT8ARRAY))
-        (call $define_property<ref.ref.i32> global($self.Uint16Array)  (call $get_self_symbol<>ref) global($TYPE_UINT16ARRAY))
-        (call $define_property<ref.ref.i32> global($self.Uint32Array)  (call $get_self_symbol<>ref) global($TYPE_UINT32ARRAY))
-        (call $define_property<ref.ref.i32> global($self.Float32Array) (call $get_self_symbol<>ref) global($TYPE_FLOAT32ARRAY))
-        (call $define_property<ref.ref.i32> global($self.DataView)     (call $get_self_symbol<>ref) global($TYPE_DATAVIEW))
+        (call $define_property<ref.ref.i32> global($self.Uint8Array)   (call $get_self_symbol<>ref) global($TYPE_Uint8))
+        (call $define_property<ref.ref.i32> global($self.Uint16Array)  (call $get_self_symbol<>ref) global($TYPE_Uint16))
+        (call $define_property<ref.ref.i32> global($self.Uint32Array)  (call $get_self_symbol<>ref) global($TYPE_Uint32))
+        (call $define_property<ref.ref.i32> global($self.Float32Array) (call $get_self_symbol<>ref) global($TYPE_Float32))
+        (call $define_property<ref.ref.i32> global($self.DataView)     (call $get_self_symbol<>ref) global($TYPE_DataView))
         
         (call $define_property<fun.ref.ref> func($this) (text 'threads') global($worker.threads))
         (call $define_property<fun.ref.ref> func($this) (text 'memory') (call $get_memory<>ref))

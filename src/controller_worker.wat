@@ -7,7 +7,7 @@
 
         (; check is calc requested ;)
         (if (call $get_func_index<>i32)
-            (then
+            (then            
                 (call $set_active_workers<i32>
                     (call $notify_worker_mutex<>i32)
                 )
