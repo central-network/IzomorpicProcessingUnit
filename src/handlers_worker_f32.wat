@@ -30,6 +30,7 @@
         update($func_table (call $fni global($OP_NEAREST) global($TYPE_Float32) global($VARIANT_0)) func($f32v_nearest_0))
         update($func_table (call $fni global($OP_NEG) global($TYPE_Float32) global($VARIANT_0)) func($f32v_neg_0))
         update($func_table (call $fni global($OP_ABS) global($TYPE_Float32) global($VARIANT_0)) func($f32v_abs_0))
+        update($func_table (call $fni global($OP_SQRT) global($TYPE_Float32) global($VARIANT_0)) func($f32v_sqrt_0))
     )
 
     (func $f32v_floor_0
