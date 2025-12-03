@@ -2,8 +2,6 @@ WebAssembly.instantiateStreaming(fetch("cpu.wasm"), self).then(wasm => {
     const cpu = wasm.instance.exports;
     console.error({ cpu });
 
-    setTimeout(() => cpu.this.destroy(), 3000)
-
     const source = new Float32Array(12).map(Math.random);
     const values = cpu.new(Float32Array, 12).fill(100);
     const target = new Float32Array(12);
@@ -16,5 +14,4 @@ WebAssembly.instantiateStreaming(fetch("cpu.wasm"), self).then(wasm => {
 
     let call = cpu.mul(source, values, target);
     call.then(() => console.warn(target))
-    console.warn(call);
 });
