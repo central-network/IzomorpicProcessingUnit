@@ -15,21 +15,29 @@
         call $start
         loop $while
 
-            call $lock_worker_mutex<>
-
             call $get_func_index<>i32
             call_indirect $func_table 
 
-            (if (0 === $--active_worker_count<>i32()) 
-                (then (call $notify_window_mutex<>)))
-
-            (br_if $while
-                (i32.ne 
-                    (call $get_ready_state<>i32)
-                    global($READY_STATE_CLOSING)
-                ) 
+            (log<i32.i32.i32>
+                (global.get $worker_index)
+                (call $get_notifier_index<>i32)
+                (call $get_locked_workers<>i32)
             )
+
+            (if (i32.eq
+                    (call $new_locked_index<>i32)
+                    (call $get_notifier_index<>i32)
+                ) 
+                (then 
+                    (call $notify_window_mutex<>)
+                )
+            )
+
+            call $lock_worker_mutex<>
+
+            br $while
         end
+
         call $close
     )
 
@@ -52,12 +60,6 @@
             )
         )
 
-        (if (i32.eq $get_worker_count<>i32()
-                global($worker_index)++
-            )
-            (then (call $notify_window_mutex<>))
-        )
-
         (call $set_handlers<>)
     )
 
@@ -67,12 +69,9 @@
         )
     )
 
-    (func $--active_worker_count<>i32
-        (result i32)
-        (i32.sub (i32.atomic.rmw.sub global($OFFSET_ACTIVE_WORKERS) i32(1)) i32(1))
-    )
-
     (func $notify_window_mutex<>
+        (local $isNotified i32)
+
         (if (memory.atomic.notify global($OFFSET_WINDOW_MUTEX) true)
             (then return)
         )

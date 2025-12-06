@@ -14,14 +14,33 @@
         (i32.atomic.load global($OFFSET_ACTIVE_WORKERS))
     )
 
-    (func $get_ready_state<>i32
+    (func $get_locked_workers<>i32
         (result $value i32)
-        (i32.atomic.load global($OFFSET_READY_STATE))
+        (i32.atomic.load global($OFFSET_LOCKED_WORKERS))
+    )
+
+    (func $set_locked_workers<i32>
+        (param $value i32)
+        (i32.atomic.store global($OFFSET_LOCKED_WORKERS) local($value))
+    )
+
+    (func $new_locked_index<>i32
+        (result $value i32)
+        (i32.atomic.rmw.add global($OFFSET_LOCKED_WORKERS) i32(1))
+    )
+
+    (func $get_notifier_index<>i32
+        (result $value i32)
+        (i32.atomic.load global($OFFSET_NOTIFIER_INDEX))
     )
 
     (func $get_func_index<>i32
         (result $value i32)
-        (i32.load global($OFFSET_FUNC_INDEX))
+        (i32.atomic.load global($OFFSET_FUNC_INDEX))
+    )
+
+    (func $reset_func_index<>
+        (i32.atomic.store global($OFFSET_FUNC_INDEX) i32(0))
     )
 
     (func $get_stride<>i32

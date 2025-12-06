@@ -6,7 +6,6 @@
         (call $self.Reflect.deleteProperty<ref.ref> global($self.Float32Array) (call $get_self_symbol<>ref))
         (call $self.Reflect.deleteProperty<ref.ref> global($self.DataView)     (call $get_self_symbol<>ref))
 
-        (call $self.Reflect.deleteProperty<fun.ref> func($this) (text 'create'))
         (call $self.Reflect.deleteProperty<fun.ref> func($this) (text 'destroy'))
         (call $self.Reflect.deleteProperty<fun.ref> func($this) (text 'memory'))
     )

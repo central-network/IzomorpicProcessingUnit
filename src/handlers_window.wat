@@ -45,8 +45,9 @@
     (func $shr      (export "shr")     (type $arg3) (call $calc global($OP_SHR)     local(0) local(1) local(2)))
 
     (global $target/userView mut extern)
-    (global $target/mallocView mut extern)
-    (global $target/needsUpdate mut i32)
+    (global $target/needReset mut i32)
+    (global $target/memoryView mut extern)
+    (global $active_task_offset mut i32)
 
     (func $import
         (param  $userView ref)
@@ -54,7 +55,7 @@
         (param  $isntTarget i32)
         (result $view ref)
         
-        (local  $mallocView ref)
+        (local  $memoryView ref)
         (local  $isNotArray i32)
         (local  $hasSrcView i32)
         (local  $byteOffset i32)
@@ -100,7 +101,7 @@
             )
         )
 
-        (local.set $mallocView
+        (local.set $memoryView
             (call $new
                 local($userView).constructor
                 local($userView).length
@@ -110,7 +111,7 @@
         (if (local.get $isntTarget)
             (then
                 (apply $self.TypedArray:set<ref>
-                    local($mallocView) 
+                    local($memoryView) 
                     (param
                         local($userView)
                     )
@@ -118,12 +119,12 @@
             )
             (else
                 (global.set $target/userView local($userView))
-                (global.set $target/mallocView local($mallocView))
-                (global.set $target/needsUpdate true)
+                (global.set $target/needReset true)
+                (global.set $target/memoryView local($memoryView))
             )
         )
 
-        local($mallocView)
+        local($memoryView)
     )
 
     (func $is_mixed_space<i32.i32.i32>i32
@@ -229,33 +230,45 @@
         local($func_index)
     )
 
-    (global $isBusy mut i32)
+    (global $isSpawning mut i32)
+
+    (table $task.promise 1 65536 externref)
+    (table $task.resolve 65536 externref)
+    (table $task.reject 65536 externref)
+    (table $task.userView 65536 externref)
+    (table $task.memoryView 65536 externref)
+
+    (export "task.promise" (table $task.promise))
+    (export "task.resolve" (table $task.resolve))
+    (export "task.reject" (table $task.reject))
+    (export "task.userView" (table $task.userView))
+    (export "task.memoryView" (table $task.memoryView))    
+
+    (global $isProcessing mut i32)
 
     (func $calc
-        (param  $opcode               i32)
-        (param  $source      <TypedArray>)
-        (param  $values      <TypedArray>)
-        (param  $target      <TypedArray>)
-        (result $promise        <Promise>)
-        
-        (local  $source_ptr           i32)
-        (local  $values_ptr           i32)
-        (local  $target_ptr           i32)
-        (local  $buffer_len           i32)
-        (local  $func_index           i32)
+        (param  $opcode                 i32)
+        (param  $source        <TypedArray>)
+        (param  $values        <TypedArray>)
+        (param  $target        <TypedArray>)
+        (result $promise          <Promise>)
 
-        (if global($isBusy) (then 
-            (error<ref> (new $self.Error<ref>ref text('CPU is busy')))
-            (unreachable)
-        ))
+        (local  $queue_offset           i32)
+        (local  $promise          <Promise>)
+        (local  $resolve         <Function>)
+        (local  $reject          <Function>)
+        (local  $withResolvers     <Object>)
 
-        (global.set $isBusy true)
+        (local  $task_index             i32)
+        (local  $func_index             i32)
+        (local  $source_ptr             i32)
+        (local  $values_ptr             i32)
+        (local  $target_ptr             i32)
+        (local  $buffer_len             i32)
+
 
         (local.set $source      (call $import local($source) null true))
-        (local.set $target      (call $import local($target) local($source) false))
-
         (local.set $source_ptr  local($source).byteOffset)
-        (local.set $target_ptr  local($target).byteOffset)
 
         (if (i32.eqz (ref.is_null local($values)))
             (then
@@ -263,6 +276,9 @@
                 (local.set $values_ptr  local($values).byteOffset)
             )
         )
+
+        (local.set $target      (call $import local($target) local($source) false))
+        (local.set $target_ptr  local($target).byteOffset)
 
         (local.set $buffer_len
             (call $get_used_bytes<ref>i32 
@@ -279,66 +295,101 @@
                 local($target_ptr)
             )
         )
-                
-        (call $set_func_index<i32> local($func_index))
-        (call $set_buffer_len<i32> local($buffer_len))
-        (call $set_source_ptr<i32> local($source_ptr))
-        (call $set_values_ptr<i32> local($values_ptr))
-        (call $set_target_ptr<i32> local($target_ptr))
 
-        (if (i32.eq global($READY_STATE_OPEN)
-                (call $get_ready_state<>i32)
-            ) 
-            (then
-                (call $set_active_workers<i32>
-                    (call $notify_worker_mutex<>i32)
-                )
+        (local.set $queue_offset
+            (call $new_queue_offset<>i32)
+        )
+
+        (local.set $withResolvers 
+            (call $self.Reflect.apply<ref.ref.ref>ref
+                global($self.Promise.withResolvers)
+                global($self.Promise)
+                self
             )
         )
 
-        (apply $self.Promise.prototype.then<fun>ref
-            (call $create_wait_promise<>ref)
-            (param func($ontaskcomplete<>))
+        (local.set $promise  (call $self.Reflect.get<ref.ref>ref local($withResolvers) text('promise')))
+        (local.set $resolve  (call $self.Reflect.get<ref.ref>ref local($withResolvers) text('resolve')))
+        (local.set $reject   (call $self.Reflect.get<ref.ref>ref local($withResolvers) text('reject')))
+
+        (local.set $task_index 
+            insert($task.promise local($promise))
         )
+
+        update($task.resolve local($task_index) local($resolve))
+        update($task.reject  local($task_index) local($reject))
+
+        (if global($target/needReset)
+            (then
+                update($task.userView local($task_index) global($target/userView))                
+                update($task.memoryView local($task_index) global($target/memoryView))  
+            )
+        )
+
+        (call $set_queue_task_index<i32.i32> local($queue_offset) local($task_index))
+        (call $set_queue_func_index<i32.i32> local($queue_offset) local($func_index))
+        (call $set_queue_buffer_len<i32.i32> local($queue_offset) local($buffer_len))
+        (call $set_queue_source_ptr<i32.i32> local($queue_offset) local($source_ptr))
+        (call $set_queue_values_ptr<i32.i32> local($queue_offset) local($values_ptr))
+        (call $set_queue_target_ptr<i32.i32> local($queue_offset) local($target_ptr))
+        (call $set_queue_need_reset<i32.i32> local($queue_offset) global($target/needReset))
+        (call $set_queue_task_state<i32.i32> local($queue_offset) global($TASK_STATE_QUEUED))
+        (call $process_task_queue)
+
+        local($promise)
     )
 
     (func $ontaskcomplete<>
-        (global.set $isBusy false)
-    
-        (if global($target/needsUpdate)
-            (then
-                (apply $self.TypedArray:set<ref>
-                    global($target/userView)
-                    (param global($target/mallocView))
-                )
+        (local $task ref)
+        (local $task_index i32)
+        (local $queue_offset i32)
+        (local $withResolvers ref)
 
-                (global.set $target/userView null)
-                (global.set $target/mallocView null)
-                (global.set $target/needsUpdate false)
+        (warn<ref.i32> text('task completed') global($active_task_offset))
+
+        (local.set $queue_offset 
+            global($active_task_offset)
+        )
+
+        (global.set $active_task_offset false)
+        
+        (local.set $task_index
+            (call $get_queue_task_index<i32>i32 
+                local($queue_offset)
             )
         )
+    
+        (if (call $get_queue_need_reset<i32>i32 local($queue_offset))
+            (then
+                (apply $self.TypedArray:set<ref>
+                    select($task.userView local($task_index))
+                    (param select($task.memoryView local($task_index)))
+                )
+            )
+        )
+
+        (call $self.Reflect.apply<ref.ref.ref>
+            select($task.resolve local($task_index))
+            select($task.promise local($task_index))
+            self
+        )
+
+        (call $set_queue_task_state<i32.i32>
+            local($queue_offset) global($TASK_STATE_COMPLETED)
+        )
+
+        (global.set $isProcessing false)
+        (call $process_task_queue)
     )
 
-    (func $notify_worker_mutex<>i32
+    (func $notify_worker_mutex<i32>i32
+        (param $concurrency i32)
         (result $notifiedWorkerCount i32)
 
         (call $self.Atomics.notify<ref.i32.i32>i32
             global($i32View) 
             global($INDEX_WORKER_MUTEX)
-            (call $get_worker_count<>i32)
-        )
-    )
-
-    (func $create_wait_promise<>ref
-        (result ref)
-
-        (call $self.Reflect.get<ref.ref>ref
-            (call $self.Atomics.waitAsync<ref.i32.i32>ref
-                global($i32View) 
-                global($INDEX_WINDOW_MUTEX) 
-                false
-            )
-            text('value')
+            local($concurrency)
         )
     )
 

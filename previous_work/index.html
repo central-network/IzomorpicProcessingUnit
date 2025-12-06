@@ -1,0 +1,26 @@
+<script type="module" crossorigin>
+    import PU from "./navigator.pu.js"
+
+    const luna = new PU();
+    const data = new Float32Array(6400 * 4000).map(Math.random);
+
+    let job;
+    let jobs = [];
+
+    let t = performance.now();
+    let i = 100;
+    let c = data.length * i * data.BYTES_PER_ELEMENT;
+
+    while (i--) {
+        jobs.push(luna.calc("f32_add", 100 * Math.random(), data))
+    }
+
+    console.log(data)
+    console.log(luna)
+
+    Promise.all(jobs).then(() => {
+        t = performance.now() - t;
+        console.log(c, "bytes calculated in", t, "miliseconds which means", ((t / 1e3) * c) / 1e9, "GB per second")
+        //output: 10240000000 'bytes calculated in' 5665.5 'miliseconds which means' 58.014771198730 'GB per second'
+    })
+</script>

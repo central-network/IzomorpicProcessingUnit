@@ -60,10 +60,10 @@
         (call $set_capacity<i32>        (i32.mul global($DEFAULT_MEMORY_INITIAL) i32(65536)))
         (call $set_maxlength<i32>       (i32.mul global($DEFAULT_MEMORY_MAXIMUM) i32(65536)))
 
-        (call $set_ready_state<i32>     global($READY_STATE_OPENING))
         (call $set_worker_count<i32>    local($workerCount))
         (call $set_active_workers<i32>  i32(0))
         (call $set_locked_workers<i32>  i32(0))
+        (call $set_notifier_index<i32>  (i32.sub local($workerCount) i32(1)))
 
         (call $set_func_index<i32>      i32(0))
         (call $set_stride<i32>          (i32.mul local($workerCount) i32(16)))
@@ -74,4 +74,9 @@
         (call $set_source_ptr<i32>      i32(0))
         (call $set_values_ptr<i32>      i32(0))
         (call $set_target_ptr<i32>      i32(0))
+
+        (i32.store global($OFFSET_ZERO)         i32(0))
+        (i32.store global($OFFSET_HEAP_PTR)     global($HEAP_START))
+        (i32.store global($OFFSET_CAPACITY)     (i32.mul i32(1) i32(65536)))
+        (i32.store global($OFFSET_MAXLENGTH)    i32(0))
     )

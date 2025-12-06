@@ -1,25 +1,11 @@
 
-
-    (func $onlastworkeropen<>
-        (call $set_ready_state<i32>
-            global($READY_STATE_OPEN)
-        )
-
-        (; check is calc requested ;)
-        (if (call $get_func_index<>i32)
-            (then            
-                (call $set_active_workers<i32>
-                    (call $notify_worker_mutex<>i32)
-                )
-            )
-        )
-    )
-
     (func $terminate_all_workers<>
         (local $threads      <Array>)
         (local $worker      <Worker>)
         (local $index            i32)
 
+        (global.set $isSpawning false)
+        
         (local.set $index $get_worker_count<>i32())
         (local.set $threads global($worker.threads))
 
@@ -37,43 +23,19 @@
                 local($worker) (param)
             )
 
+            (apply $self.Array:splice<i32.i32> 
+                this (param local($index) i32(1))
+            )
+
             (br_if $workerCount-- local($index))
         )
-        
-        (apply $self.Array:splice<i32.i32> 
-            this (param i32(0) (call $notify_worker_mutex<>i32))
-        )
 
-        (call $set_worker_count<i32> i32(0))
+        (call $set_active_workers<i32> i32(0))
+        (call $set_locked_workers<i32> i32(0))
+        (i32.atomic.store global($OFFSET_MAXLENGTH) i32(0))
     )
 
-    (func $create_worker_threads<>
-        (local $workerCount          i32)
-        (local $worker          <Worker>)
 
-        (local.set $workerCount
-            (call $get_worker_count<>i32)
-        )
-
-        (loop $fork
-            (local.set $worker
-                (new $self.Worker<ref.ref>ref
-                    (call $get_worker_url<>ref)
-                    (call $get_worker_config<>ref)
-                )
-            )
-
-            (apply $self.Worker:postMessage<ref>
-                local($worker) (param $get_worker_data<>ref())
-            )
-
-            (apply $self.Array:push<ref>
-                global($worker.threads) (param local($worker))
-            )
-
-            (br_if $fork tee($workerCount local($workerCount)--))
-        )        
-    )
 
 
     (func $get_worker_module<>ref
