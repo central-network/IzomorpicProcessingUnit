@@ -2,7 +2,7 @@
   "name": "cpu.wasm",
   "version": "1.0.0",
   "description": "Using cpu with threads",
-  "homepage": "https://github.com/central-network/cpu.wasm#readme",
+  "homepage": "https://cen.net/cpu.wasm/",
   "bugs": {
     "url": "https://github.com/central-network/cpu.wasm/issues"
   },

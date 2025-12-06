@@ -1,6 +1,13 @@
 (module
     (import "env" "memory" (memory 10 10 shared))
 
+    ;; ------------------------------------------------------------------------------------------------------------
+    ;; WORKER LIFECYCLE
+    ;; ------------------------------------------------------------------------------------------------------------
+
+    ;; Imported Task Logic
+    (import "task" "execute_task" (func $execute_task (param i32) (result i32)))
+
     ;; ============================================================================================================
     ;; WORKER HEADER ARCHITECTURE
     ;; ============================================================================================================
@@ -170,88 +177,172 @@
     )
 
     ;; ------------------------------------------------------------------------------------------------------------
+    ;; CHAIN CONSTANTS (Must match chain_manager.wat)
+    ;; ------------------------------------------------------------------------------------------------------------
+    (global $OFFSET_TASK_STATE_BLOCK        i32 (i32.const 64))
+    (global $OFFSET_TASK_HEADERS_START      i32 (i32.const 128))
+    (global $TASK_HEADER_SIZE               i32 (i32.const 64))
+
+    ;; ------------------------------------------------------------------------------------------------------------
     ;; WORKER LIFECYCLE
     ;; ------------------------------------------------------------------------------------------------------------
 
     (func $start (export "start")
         (param $worker_id i32)
         (param $current_time f32)
+        (param $chain_ptr i32) ;; NEW: Pointer to the Chain Block
         
+        (local $task_ptr i32)
+        (local $state_block_ptr i32)
+        (local $scan_vec v128)
+        (local $task_index i32)
+        (local $byte_offset i32)
+        (local $inner_loop i32)
+
         ;; 1. Record Deploy Epoch
-        (call $set_worker_deploy_epoch<i32> 
-            (local.get $worker_id)
-            (local.get $current_time)
-        )
+        (call $set_worker_deploy_epoch<i32> (local.get $worker_id) (local.get $current_time))
         
         ;; 2. Signal STARTED
-        (call $set_worker_last_state<i32> 
-            (local.get $worker_id) 
-            (global.get $WORKER_STATE_STARTED)
+        (call $set_worker_last_state<i32> (local.get $worker_id) (global.get $WORKER_STATE_STARTED))
+
+        ;; Calculate State Block Pointer once
+        (local.set $state_block_ptr 
+            (i32.add (local.get $chain_ptr) (global.get $OFFSET_TASK_STATE_BLOCK))
         )
 
         ;; 3. Loop until Window says CLOSE
         (loop $lifecycle
             
-            ;; Check Window State
-            (if (i32.eq 
-                    (call $get_worker_window_last_state<i32>i32 (local.get $worker_id))
-                    (global.get $WINDOW_STATE_REQUEST_CLOSE)
-                )
+            ;; Check Window State (Exit Check)
+            (if (i32.eq (call $get_worker_window_last_state<i32>i32 (local.get $worker_id)) (global.get $WINDOW_STATE_REQUEST_CLOSE))
                 (then
-                    ;; Acknowledge Closing
-                    (call $set_worker_last_state<i32> 
-                        (local.get $worker_id) 
-                        (global.get $WORKER_STATE_CLOSING)
-                    )
-                    
-                    ;; Record Destroy Epoch (Simulated end time, for now reusing start time or need another source)
-                    ;; Since we don't have clock, we can't write real end time unless imported.
-                    ;; We will skip writing DESTROY epoch here or write same time for prototype.
-                    ;; Or better: JS writes Destroy Epoch? 
-                    ;; User description: "worker_destroy_epoch: f32 (kapatma protokolü başlangıcı, wasm)"
-                    ;; Okay, we will write it here. But what value? $current_time is old.
-                    ;; We'll just write 0.0 or duplicate for now as placeholder, or import a time func?
-                    ;; User didn't specify import. Let's send 0.0 to mark "we reached here".
-                    
-                    (call $set_worker_destroy_epoch<i32>
-                        (local.get $worker_id)
-                        (f32.const -1.0) ;; MARKER
-                    )
-
-                    (return) ;; Exit Worker
+                    (call $set_worker_last_state<i32> (local.get $worker_id) (global.get $WORKER_STATE_CLOSING))
+                    (call $set_worker_destroy_epoch<i32> (local.get $worker_id) (f32.const -1.0))
+                    (return)
                 )
             )
 
-            ;; Simulated Work / Locking Test
-            (if (i32.eq
-                    (i32.atomic.rmw.cmpxchg offset=0 ;; OFFSET_WORKER_MUTEX
-                        (call $get_worker_offset<i32>i32 (local.get $worker_id))
-                        (i32.const 0) 
-                        (i32.const 1) 
-                    )
-                    (i32.const 0) 
-                )
-                (then
-                    ;; LOCKED! Signal State
-                    (call $set_worker_last_state<i32> 
-                        (local.get $worker_id) 
-                        (global.get $WORKER_STATE_LOCKED)
-                    )
-                    
-                    ;; Unlock
-                    (call $set_worker_mutex<i32> 
-                        (local.get $worker_id) 
-                        (i32.const 0)
-                    )
-                    
-                    ;; Back to WORKING state
-                    (call $set_worker_last_state<i32> 
-                        (local.get $worker_id) 
-                        (global.get $WORKER_STATE_WORKING)
-                    )
-                )
-            )
+            ;; CHAIN WALKER (v128 Scan)
+            ;; We scan 4 vectors of 16 bytes (64 tasks total)
+            ;; Vector 0: Tasks 0-15
+            ;; Vector 1: Tasks 16-31
+            ;; Vector 2: Tasks 32-47
+            ;; Vector 3: Tasks 48-63
             
+            (local.set $inner_loop (i32.const 0))
+            (loop $scan_vectors
+                (if (i32.lt_u (local.get $inner_loop) (i32.const 4))
+                    (then
+                        ;; Load v128 from State Block + (inner_loop * 16)
+                        (local.set $scan_vec
+                            (v128.load 
+                                (i32.add 
+                                    (local.get $state_block_ptr) 
+                                    (i32.mul (local.get $inner_loop) (i32.const 16))
+                                )
+                            )
+                        )
+
+                        ;; Check if ANY byte is non-zero
+                        (if (v128.any_true (local.get $scan_vec))
+                            (then
+                                ;; Found a vector with tasks!
+                                ;; Now iterate bytes in this vector to find the specific task
+                                ;; Simplify: Iterate 0..15
+                                (local.set $byte_offset (i32.const 0))
+                                (loop $find_task
+                                    (if (i32.lt_u (local.get $byte_offset) (i32.const 16))
+                                        (then
+                                            ;; Current Task Index = (Vector Index * 16) + Byte Offset
+                                            (local.set $task_index
+                                                (i32.add
+                                                    (i32.mul (local.get $inner_loop) (i32.const 16))
+                                                    (local.get $byte_offset)
+                                                )
+                                            )
+                                            
+                                            ;; Check byte at this index
+                                            (if (i32.eq 
+                                                    (i32.load8_u offset=0 
+                                                        (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                    )
+                                                    (i32.const 1) ;; 1 = PENDING
+                                                )
+                                                (then
+                                                    ;; ATOMIC CLAIM
+                                                    ;; CAS: Expect 1, Write 2 (WORKING)
+                                                    ;; If success, we execute.
+                                                    (if (i32.eq
+                                                            (i32.atomic.rmw8.cmpxchg_u offset=0
+                                                                (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                                (i32.const 1)
+                                                                (i32.const 2)
+                                                            )
+                                                            (i32.const 1)
+                                                        )
+                                                        (then
+                                                            ;; CLAIMED! Execute.
+                                                            (call $set_worker_last_state<i32> (local.get $worker_id) (global.get $WORKER_STATE_WORKING))
+                                                            
+                                                            ;; Calculate Task Pointer
+                                                            (local.set $task_ptr
+                                                                (i32.add
+                                                                    (local.get $chain_ptr)
+                                                                    (i32.add
+                                                                        (global.get $OFFSET_TASK_HEADERS_START)
+                                                                        (i32.mul (local.get $task_index) (global.get $TASK_HEADER_SIZE))
+                                                                    )
+                                                                )
+                                                            )
+                                                            
+                                                            ;; Execute Task
+                                                            (drop (call $execute_task (local.get $task_ptr)))
+                                                            
+                                                            ;; Mark Done (0)
+                                                            (i32.atomic.store8 offset=0
+                                                                (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                                (i32.const 0)
+                                                            )
+                                                            
+                                                            ;; ----------------------------------------------------------------------------------------
+                                                            ;; CHAIN REACTION (Dependency Trigger)
+                                                            ;; ----------------------------------------------------------------------------------------
+                                                            ;; Check NEXT_TASK_INDEX at Offset 0 of Task Header
+                                                            (local.set $task_index 
+                                                                (i32.load offset=0 (local.get $task_ptr))
+                                                            )
+                                                            
+                                                            (if (i32.ne (local.get $task_index) (i32.const -1))
+                                                                (then
+                                                                    ;; Target Valid! Activate it in State Block.
+                                                                    ;; State Block Pointer + Next Task Index
+                                                                    (i32.store8 offset=0
+                                                                        (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                                        (i32.const 1) ;; Set to PENDING (1)
+                                                                    )
+                                                                )
+                                                            )
+
+                                                            (call $set_worker_last_state<i32> (local.get $worker_id) (global.get $WORKER_STATE_STARTED))
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                            
+                                            (local.set $byte_offset (i32.add (local.get $byte_offset) (i32.const 1)))
+                                            (br $find_task)
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    
+                        (local.set $inner_loop (i32.add (local.get $inner_loop) (i32.const 1)))
+                        (br $scan_vectors)
+                    )
+                )
+            )
+
             (br $lifecycle)
         )
     )
