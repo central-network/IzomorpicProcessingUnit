@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chain Visualizer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2rem;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .grid-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            gap: 4px;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .cell.idle {
+            background: #2d3436;
+            color: #636e72;
+        }
+
+        .cell.pending {
+            background: #fdcb6e;
+            color: #2d3436;
+            animation: pulse 0.5s infinite;
+        }
+
+        .cell.working {
+            background: #00b894;
+            color: #fff;
+            box-shadow: 0 0 20px #00b894;
+        }
+
+        .cell.done {
+            background: #0984e3;
+            color: #fff;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            min-width: 300px;
+        }
+
+        .controls h2 {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #00d9ff;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-start {
+            background: linear-gradient(90deg, #00b894, #00d9ff);
+            color: #fff;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 217, 255, 0.4);
+        }
+
+        .btn-stop {
+            background: #d63031;
+            color: #fff;
+        }
+
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .log {
+            max-height: 150px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            padding: 2px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>⚡ Chain Visualizer</h1>
+
+    <div class="container">
+        <div class="grid-container">
+            <div class="grid" id="taskGrid"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#2d3436"></div> Idle
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#fdcb6e"></div> Pending
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#00b894"></div> Working
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#0984e3"></div> Done
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h2>📊 Statistics</h2>
+            <div class="stat"><span>Pending Tasks</span><span class="stat-value" id="statPending">0</span></div>
+            <div class="stat"><span>Working Tasks</span><span class="stat-value" id="statWorking">0</span></div>
+            <div class="stat"><span>Completed Tasks</span><span class="stat-value" id="statDone">0</span></div>
+            <div class="stat"><span>FPS</span><span class="stat-value" id="statFps">0</span></div>
+
+            <button class="btn-start" id="btnStart">🚀 Start Demo Chain</button>
+            <button class="btn-stop" id="btnStop" style="display:none">⏹ Stop Workers</button>
+
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Chain Visualizer - Real-time UI for Chain Engine
+
+        const grid = document.getElementById('taskGrid');
+        const log = document.getElementById('log');
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+
+        // Create 64 cells
+        for (let i = 0; i < 64; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell idle';
+            cell.textContent = i;
+            cell.id = `cell-${i}`;
+            grid.appendChild(cell);
+        }
+
+        function addLog(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.prepend(entry);
+            if (log.children.length > 50) log.removeChild(log.lastChild);
+        }
+
+        // State
+        let memory = null;
+        let stateBlock = null;
+        let workers = [];
+        let running = false;
+        let frameCount = 0;
+        let lastFpsTime = performance.now();
+
+        const CHAIN_BLOCK_PTR = 10000;
+        const STATE_BLOCK_OFFSET = CHAIN_BLOCK_PTR + 64;
+
+        function updateGrid() {
+            if (!stateBlock) return;
+
+            let pending = 0, working = 0, done = 0;
+
+            for (let i = 0; i < 64; i++) {
+                const state = stateBlock[i];
+                const cell = document.getElementById(`cell-${i}`);
+
+                cell.classList.remove('idle', 'pending', 'working', 'done');
+
+                if (state === 0) {
+                    cell.classList.add('idle');
+                } else if (state === 1) {
+                    cell.classList.add('pending');
+                    pending++;
+                } else if (state === 2) {
+                    cell.classList.add('working');
+                    working++;
+                } else {
+                    cell.classList.add('done');
+                    done++;
+                }
+            }
+
+            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statWorking').textContent = working;
+            document.getElementById('statDone').textContent = done;
+
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsTime > 1000) {
+                document.getElementById('statFps').textContent = frameCount;
+                frameCount = 0;
+                lastFpsTime = now;
+            }
+
+            if (running) requestAnimationFrame(updateGrid);
+        }
+
+        async function startDemo() {
+            addLog('Starting Chain Visualizer Demo...');
+
+            memory = new WebAssembly.Memory({ initial: 10, maximum: 10, shared: true });
+            const u8 = new Uint8Array(memory.buffer);
+            const i32 = new Int32Array(memory.buffer);
+            const f32 = new Float32Array(memory.buffer);
+
+            stateBlock = new Uint8Array(memory.buffer, STATE_BLOCK_OFFSET, 64);
+
+            try {
+                const [workerBytes, taskBytes, managerBytes] = await Promise.all([
+                    fetch('chain_worker.wasm').then(r => r.arrayBuffer()),
+                    fetch('chain_task.wasm').then(r => r.arrayBuffer()),
+                    fetch('chain_manager.wasm').then(r => r.arrayBuffer())
+                ]);
+
+                const workerModule = await WebAssembly.compile(workerBytes);
+                const taskModule = await WebAssembly.compile(taskBytes);
+                const managerModule = await WebAssembly.compile(managerBytes);
+
+                const managerInstance = await WebAssembly.instantiate(managerModule, { env: { memory } });
+
+                addLog('Initializing Chain Block...');
+                managerInstance.exports.init_chain(CHAIN_BLOCK_PTR);
+
+                // Setup a demo chain: 0 -> 5 -> 10 -> 15 -> 20 -> 25 -> 30
+                const chainIndices = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+                const RESULT_PTR = 15000;
+
+                for (let i = 0; i < chainIndices.length; i++) {
+                    const idx = chainIndices[i];
+                    const nextIdx = i < chainIndices.length - 1 ? chainIndices[i + 1] : -1;
+
+                    const taskPtr = CHAIN_BLOCK_PTR + 128 + (idx * 64);
+                    i32[(taskPtr + 0) >> 2] = nextIdx;
+                    i32[(taskPtr + 8) >> 2] = -1;
+                    u8[taskPtr + 6] = 0; // No loop
+                    i32[(taskPtr + 32) >> 2] = 1;
+                    i32[(taskPtr + 64) >> 2] = 16000 + (i * 16);
+
+                    // Command: ADD 1 + 1
+                    const cmdPtr = 16000 + (i * 16);
+                    i32[(cmdPtr + 0) >> 2] = 1; // ADD
+                    f32[(cmdPtr + 4) >> 2] = 1;
+                    f32[(cmdPtr + 8) >> 2] = 1;
+                    i32[(cmdPtr + 12) >> 2] = RESULT_PTR + (i * 4);
+                }
+
+                addLog(`Chain created: ${chainIndices.join(' → ')}`);
+
+                // Spawn workers
+                const workerCode = `
+                    onmessage = async (e) => {
+                        const { memory, workerModule, taskModule, id, chainPtr } = e.data;
+                        try {
+                            const taskInstance = await WebAssembly.instantiate(taskModule, { env: { memory } });
+                            const workerInstance = await WebAssembly.instantiate(workerModule, {
+                                env: { memory },
+                                task: { execute_task: taskInstance.exports.execute_task }
+                            });
+                            if (workerInstance.exports.start) {
+                                workerInstance.exports.start(id, performance.now(), chainPtr);
+                            }
+                        } catch (err) {
+                            console.error('Worker ' + id + ' Error:', err);
+                        }
+                    };
+                `;
+
+                const blob = new Blob([workerCode], { type: 'application/javascript' });
+                const workerUrl = URL.createObjectURL(blob);
+
+                for (let i = 0; i < 4; i++) {
+                    const worker = new Worker(workerUrl);
+                    workers.push(worker);
+                    worker.postMessage({
+                        memory,
+                        workerModule,
+                        taskModule,
+                        id: i,
+                        chainPtr: CHAIN_BLOCK_PTR
+                    });
+                }
+
+                addLog('4 Workers spawned!');
+
+                // Activate first task
+                addLog('Igniting Task 0...');
+                managerInstance.exports.activate_task(CHAIN_BLOCK_PTR, 0);
+
+                running = true;
+                requestAnimationFrame(updateGrid);
+
+                btnStart.style.display = 'none';
+                btnStop.style.display = 'block';
+
+            } catch (e) {
+                addLog('Error: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        function stopDemo() {
+            if (!memory) return;
+
+            const i32 = new Int32Array(memory.buffer);
+            const WORKER_MEMORY_BASE = 5120;
+            const GLOBAL_HEADER_SIZE = 64;
+            const WORKER_HEADER_SIZE = 64;
+
+            for (let i = 0; i < 4; i++) {
+                const base = WORKER_MEMORY_BASE + GLOBAL_HEADER_SIZE + (i * WORKER_HEADER_SIZE);
+                Atomics.store(i32, (base + 4) >> 2, 2);
+            }
+
+            addLog('Workers stopped.');
+            running = false;
+            workers = [];
+
+            btnStart.style.display = 'block';
+            btnStop.style.display = 'none';
+        }
+
+        btnStart.addEventListener('click', startDemo);
+        btnStop.addEventListener('click', stopDemo);
+    </script>
+</body>
+
+</html>

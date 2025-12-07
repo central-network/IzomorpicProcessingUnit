@@ -22,11 +22,25 @@
     (global $OFFSET_CMD_OPB                 i32 (i32.const 8))
     (global $OFFSET_CMD_TARGET              i32 (i32.const 12))
 
-    ;; Opcodes
+    ;; Opcodes (Immediate Values)
     (global $OP_ADD                         i32 (i32.const 1))
     (global $OP_SUB                         i32 (i32.const 2))
     (global $OP_MUL                         i32 (i32.const 3))
     (global $OP_DIV                         i32 (i32.const 4))
+
+    ;; Opcodes (Pointer-Based: OpA is a PTR, OpB is Immediate)
+    (global $OP_ADD_PTR                     i32 (i32.const 11))
+    (global $OP_SUB_PTR                     i32 (i32.const 12))
+    (global $OP_MUL_PTR                     i32 (i32.const 13))
+    (global $OP_DIV_PTR                     i32 (i32.const 14))
+
+    ;; Opcodes (Comparison: result = condition ? 1.0 : 0.0)
+    (global $OP_CMP_GT                      i32 (i32.const 21))
+    (global $OP_CMP_LT                      i32 (i32.const 22))
+    (global $OP_CMP_EQ                      i32 (i32.const 23))
+    (global $OP_CMP_GT_PTR                  i32 (i32.const 31)) ;; PTR variant
+    (global $OP_CMP_LT_PTR                  i32 (i32.const 32))
+    (global $OP_CMP_EQ_PTR                  i32 (i32.const 33))
 
     ;; ------------------------------------------------------------------------------------------------------------
     ;; EXECUTE TASK
@@ -86,7 +100,7 @@
                         (i32.load offset=12 (local.get $command_ptr))
                     )
 
-                    ;; Execute
+                    ;; Execute (Immediate Opcodes)
                     (if (i32.eq (local.get $opcode) (global.get $OP_ADD))
                         (then (local.set $result (f32.add (local.get $val_a) (local.get $val_b))))
                     )
@@ -96,8 +110,97 @@
                     (if (i32.eq (local.get $opcode) (global.get $OP_MUL))
                         (then (local.set $result (f32.mul (local.get $val_a) (local.get $val_b))))
                     )
-                     (if (i32.eq (local.get $opcode) (global.get $OP_DIV))
+                    (if (i32.eq (local.get $opcode) (global.get $OP_DIV))
                         (then (local.set $result (f32.div (local.get $val_a) (local.get $val_b))))
+                    )
+
+                    ;; Execute (Pointer-Based Opcodes: OpA is a PTR)
+                    ;; For PTR opcodes, we need to re-interpret OpA as a pointer and load the value.
+                    ;; OpA (offset 4) is stored as i32 pointer. OpB (offset 8) is immediate f32.
+                    (if (i32.eq (local.get $opcode) (global.get $OP_ADD_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result (f32.add (local.get $val_a) (local.get $val_b)))
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_SUB_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result (f32.sub (local.get $val_a) (local.get $val_b)))
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_MUL_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result (f32.mul (local.get $val_a) (local.get $val_b)))
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_DIV_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result (f32.div (local.get $val_a) (local.get $val_b)))
+                        )
+                    )
+
+                    ;; Execute (Comparison Opcodes: Immediate)
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_GT))
+                        (then 
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.gt (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_LT))
+                        (then 
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.lt (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_EQ))
+                        (then 
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.eq (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
+                    )
+
+                    ;; Execute (Comparison Opcodes: PTR)
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_GT_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.gt (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_LT_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.lt (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
+                    )
+                    (if (i32.eq (local.get $opcode) (global.get $OP_CMP_EQ_PTR))
+                        (then 
+                            (local.set $val_a (f32.load (i32.load offset=4 (local.get $command_ptr))))
+                            (local.set $result 
+                                (select (f32.const 1.0) (f32.const 0.0) 
+                                    (f32.eq (local.get $val_a) (local.get $val_b))
+                                )
+                            )
+                        )
                     )
 
                     ;; Store Result

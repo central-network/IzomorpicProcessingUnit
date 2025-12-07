@@ -305,20 +305,120 @@
                                                             )
                                                             
                                                             ;; ----------------------------------------------------------------------------------------
-                                                            ;; CHAIN REACTION (Dependency Trigger)
+                                                            ;; CONDITIONAL CHAIN REACTION (Branching)
                                                             ;; ----------------------------------------------------------------------------------------
-                                                            ;; Check NEXT_TASK_INDEX at Offset 0 of Task Header
-                                                            (local.set $task_index 
-                                                                (i32.load offset=0 (local.get $task_ptr))
-                                                            )
+                                                            ;; Read result from TARGET_PTR to determine branch
+                                                            ;; If result != 0: use NEXT_TASK_TRUE (offset 0)
+                                                            ;; Else: use NEXT_TASK_FALSE (offset 8)
                                                             
-                                                            (if (i32.ne (local.get $task_index) (i32.const -1))
+                                                            ;; Read target ptr from command (offset 12 in the last command)
+                                                            ;; For simplicity, we read from an expected location.
+                                                            ;; Or better: Read from Task Header's DST_BYTEOFFSET (0x3C)?
+                                                            ;; Actually, let's store result location in task header?
+                                                            ;; Simplest: Read from offset 0x3C (DST_BYTEOFFSET) in Task Header
+                                                            ;; which points to where result was written.
+                                                            
+                                                            ;; For prototype: Check result at DST_BYTEOFFSET (0x3C)
+                                                            ;; Actually, we don't have that set reliably. Let's use a convention:
+                                                            ;; Command's TARGET is at command_buf + 12. But we don't have cmd_buf here.
+                                                            ;; Easiest hack: Result check uses a dedicated "RESULT_PTR" field?
+                                                            ;; Or: Always branch to NEXT_TASK_TRUE for non-comparison tasks.
+                                                            ;; For comparison tasks, check result.
+                                                            
+                                                            ;; SIMPLIFIED APPROACH:
+                                                            ;; - Always check NEXT_TASK_TRUE first (offset 0).
+                                                            ;; - If != -1 AND we are NOT a comparison opcode, activate it.
+                                                            ;; - If comparison opcode, read result and branch.
+                                                            
+                                                            ;; For THIS PROTOTYPE: Use RESULT stored at a known location.
+                                                            ;; We'll read result from Task Header's RESERVED field (let's use offset 0x20?).
+                                                            ;; OR: Chain_task writes result to task_ptr + 60 (reserved).
+                                                            
+                                                            ;; CLEANEST: Read result from DST (0x3C) as a ptr, load f32, check.
+                                                            ;; But DST_BYTEOFFSET is not always set in our current tests.
+                                                            
+                                                            ;; FINAL DECISION: Just use the existing logic for now.
+                                                            ;; Branching will be tested with a dedicated "branch result" field later.
+                                                            ;; For now: If NEXT_TASK_TRUE != -1, activate it. Else check FALSE.
+
+                                                            ;; ----------------------------------------------------------------------------------------
+                                                            ;; LOOP LOGIC (Phase 7)
+                                                            ;; ----------------------------------------------------------------------------------------
+                                                            ;; Check LOOP_COUNT at offset 6 (i8)
+                                                            ;; If > 0: Decrement and re-activate SELF.
+                                                            ;; Else: Proceed to NEXT_TASK branching.
+                                                            
+                                                            ;; Save current task_index (before we overwrite it)
+                                                            ;; We need a new local for original_task_index
+                                                            ;; For simplicity, re-read from byte_offset calculation
+                                                            ;; Actually, $task_index was modified above. Let's read it fresh.
+                                                            ;; We can use: original_index = (inner_loop * 16) + byte_offset
+                                                            ;; But byte_offset increments. Let's compute before increment.
+                                                            ;; Actually, in this context, $task_index is still the CLAIMED task.
+                                                            ;; Hmm, no - we used $task_index to store the NEXT. Let's save earlier.
+                                                            ;; SIMPLEST: Read loop count, compute original index inline.
+                                                            
+                                                            ;; Original task index = (inner_loop * 16) + byte_offset
+                                                            ;; But we're deep in the claimed block. Let's use a workaround:
+                                                            ;; The task_ptr is valid. Read Loop count from task_ptr + 6.
+                                                            
+                                                            (if (i32.gt_u (i32.load8_u offset=6 (local.get $task_ptr)) (i32.const 0))
                                                                 (then
-                                                                    ;; Target Valid! Activate it in State Block.
-                                                                    ;; State Block Pointer + Next Task Index
+                                                                    ;; Decrement LOOP_COUNT
+                                                                    (i32.store8 offset=6 
+                                                                        (local.get $task_ptr) 
+                                                                        (i32.sub 
+                                                                            (i32.load8_u offset=6 (local.get $task_ptr)) 
+                                                                            (i32.const 1)
+                                                                        )
+                                                                    )
+                                                                    ;; Re-activate SELF
+                                                                    ;; Original index = (state_block_ptr index)
+                                                                    ;; We can compute: (task_ptr - chain_ptr - 128) / 64
+                                                                    ;; Or just re-activate using the state block index we already found
+                                                                    ;; Wait, we need the original task index.
+                                                                    ;; $task_index was overwritten. Let's recalculate:
+                                                                    ;; index = (task_ptr - chain_ptr - 128) / 64
+                                                                    (local.set $task_index
+                                                                        (i32.div_u
+                                                                            (i32.sub
+                                                                                (i32.sub (local.get $task_ptr) (local.get $chain_ptr))
+                                                                                (i32.const 128)
+                                                                            )
+                                                                            (i32.const 64)
+                                                                        )
+                                                                    )
                                                                     (i32.store8 offset=0
                                                                         (i32.add (local.get $state_block_ptr) (local.get $task_index))
-                                                                        (i32.const 1) ;; Set to PENDING (1)
+                                                                        (i32.const 1)
+                                                                    )
+                                                                )
+                                                                (else
+                                                                    ;; No more loops. Proceed to NEXT branching.
+                                                                    (local.set $task_index 
+                                                                        (i32.load offset=0 (local.get $task_ptr))
+                                                                    )
+                                                                    
+                                                                    (if (i32.ne (local.get $task_index) (i32.const -1))
+                                                                        (then
+                                                                            (i32.store8 offset=0
+                                                                                (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                                                (i32.const 1)
+                                                                            )
+                                                                        )
+                                                                        (else
+                                                                            (local.set $task_index 
+                                                                                (i32.load offset=8 (local.get $task_ptr))
+                                                                            )
+                                                                            (if (i32.ne (local.get $task_index) (i32.const -1))
+                                                                                (then
+                                                                                    (i32.store8 offset=0
+                                                                                        (i32.add (local.get $state_block_ptr) (local.get $task_index))
+                                                                                        (i32.const 1)
+                                                                                    )
+                                                                                )
+                                                                            )
+                                                                        )
                                                                     )
                                                                 )
                                                             )
