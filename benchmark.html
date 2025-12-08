@@ -98,6 +98,12 @@
         <div id="simpleResults"></div>
     </div>
 
+    <div class="section">
+        <h2>i32.add vs i32.load (offset calculation)</h2>
+        <button id="runAddVsLoad">▶️ Compare add vs load</button>
+        <div id="addLoadResults"></div>
+    </div>
+
     <div id="log"></div>
 
     <script>
@@ -324,12 +330,52 @@
             log(`Simple SIMD: ${t_elapsed.toFixed(2)}ms`);
         }
 
+        async function runAddVsLoadBenchmark() {
+            if (!wasmInstance) await initWASM();
+
+            const exports = wasmInstance.exports;
+            let i;
+
+            // Init linked list offsets in memory
+            log('Initializing linked-list offsets in memory...');
+            exports.init_linked_offsets();
+
+            log('i32.add offset...');
+            const t1_start = performance.now();
+            i = tcount;
+            while (i--) exports.benchmark_add_offset();
+            const t_add = performance.now() - t1_start;
+
+            log('i32.load offset (linked-list)...');
+            const t2_start = performance.now();
+            i = tcount;
+            while (i--) exports.benchmark_load_offset();
+            const t_load = performance.now() - t2_start;
+
+            const winner = t_add < t_load ? 'add' : 'load';
+            const speedup = winner === 'add'
+                ? (t_load / t_add).toFixed(2)
+                : (t_add / t_load).toFixed(2);
+
+            document.getElementById('addLoadResults').innerHTML = `
+                <div class="result ${winner === 'add' ? 'winner' : ''}">
+                    <strong>i32.add:</strong> ${t_add.toFixed(2)} ms
+                </div>
+                <div class="result ${winner === 'load' ? 'winner' : ''}">
+                    <strong>i32.load:</strong> ${t_load.toFixed(2)} ms
+                </div>
+                <div class="result">Winner: ${winner.toUpperCase()} (${speedup}x faster)</div>
+            `;
+            log(`Add: ${t_add.toFixed(2)}ms | Load: ${t_load.toFixed(2)}ms`);
+        }
+
         document.getElementById('runJS').addEventListener('click', runJSBenchmark);
         document.getElementById('runJS10').addEventListener('click', () => runMultiple(runJSBenchmark, 'jsResults', 'JS'));
         document.getElementById('runWASM').addEventListener('click', runWASMBenchmark);
         document.getElementById('runWASM10').addEventListener('click', () => runMultiple(runWASMBenchmark, 'wasmResults', 'WASM SIMD'));
         document.getElementById('runHybrid').addEventListener('click', runHybridBenchmark);
         document.getElementById('runSimple').addEventListener('click', runSimpleBenchmark);
+        document.getElementById('runAddVsLoad').addEventListener('click', runAddVsLoadBenchmark);
 
         initWASM();
     </script>

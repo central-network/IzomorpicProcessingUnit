@@ -133,4 +133,67 @@
             )
         )
     )
+
+    ;; ============================================================================
+    ;; BENCHMARK: i32.add for offset (calculate next ptr)
+    ;; ============================================================================
+    (func $benchmark_add_offset (export "benchmark_add_offset")
+        (local $ptr i32)
+        (local $count i32)
+        
+        (local.set $ptr (i32.const 0))
+        (local.set $count (i32.const 4096000))  ;; how many iterations
+
+        (loop $main
+            ;; Just increment ptr, no memory operation to isolate the cost
+            (local.set $ptr (i32.add (local.get $ptr) (i32.const 16)))
+            
+            (local.set $count (i32.sub (local.get $count) (i32.const 1)))
+            (br_if $main (local.get $count))
+        )
+    )
+
+    ;; ============================================================================
+    ;; BENCHMARK: i32.load for offset (read next ptr from memory - linked list)
+    ;; ============================================================================
+    (func $benchmark_load_offset (export "benchmark_load_offset")
+        (local $ptr i32)
+        (local $count i32)
+        
+        (local.set $ptr (i32.const 0))
+        (local.set $count (i32.const 4096000))
+
+        (loop $main
+            ;; Read next offset from memory (like linked list traversal)
+            (local.set $ptr (i32.load $memory/shared (local.get $ptr)))
+            
+            (local.set $count (i32.sub (local.get $count) (i32.const 1)))
+            (br_if $main (local.get $count))
+        )
+    )
+
+    ;; ============================================================================
+    ;; INIT: Setup linked-list style offsets in memory
+    ;; ============================================================================
+    (func $init_linked_offsets (export "init_linked_offsets")
+        (local $ptr i32)
+        (local $end i32)
+        
+        (local.set $ptr (i32.const 0))
+        (local.set $end (i32.sub (global.get $TOTAL_BYTES) (i32.const 16)))
+
+        (loop $main
+            ;; At each position, store the next offset (ptr + 16)
+            (i32.store $memory/shared 
+                (local.get $ptr) 
+                (i32.add (local.get $ptr) (i32.const 16))
+            )
+            
+            (local.set $ptr (i32.add (local.get $ptr) (i32.const 16)))
+            (br_if $main (i32.lt_u (local.get $ptr) (local.get $end)))
+        )
+        
+        ;; Last element points to 0 (loop back)
+        (i32.store $memory/shared (local.get $ptr) (i32.const 0))
+    )
 )
